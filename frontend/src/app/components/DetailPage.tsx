@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { Recommendation } from "./mockData";
 import { OptiHeader } from "./OptiHeader";
+import { SHADOW_ICON } from "../buttonStyles";
 
 interface DetailPageProps {
   rec: Recommendation;
@@ -27,7 +28,7 @@ export function DetailPage({ rec, baselines, onBack }: DetailPageProps) {
     <div className="min-h-screen flex flex-col" style={{ background: BG }}>
       <OptiHeader
         right={
-          <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}` }}>
+          <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95" style={{ background: "linear-gradient(180deg, #404A60 0%, #353D52 100%)", boxShadow: SHADOW_ICON, border: `1px solid ${BORDER}` }}>
             <ArrowLeft size={14} style={{ color: "#8A9BBF" }} />
           </button>
         }

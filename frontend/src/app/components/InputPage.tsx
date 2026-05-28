@@ -1,8 +1,17 @@
 import { useState, useEffect } from "react";
 import { Search, Navigation, X, ArrowRight, Loader2 } from "lucide-react";
 import { OptiHeader } from "./OptiHeader";
+import { TimePicker, formatTime12Label } from "./TimePicker";
 import { SearchParams } from "../App";
 import { BACKEND } from "../../config";
+import {
+  primaryButtonStyle,
+  SHADOW_ICON,
+  SHADOW_ICON_ACCENT,
+  sortTabStyle,
+  toggleKnobStyle,
+  toggleTrackStyle,
+} from "../buttonStyles";
 
 interface InputPageProps {
   onSearch: (params: SearchParams) => void;
@@ -62,6 +71,45 @@ const BORDER = "rgba(255,255,255,0.1)";
 const TEXT = "#E8F0FF";
 const MUTED = "#7A8BAA";
 const DEEP = "#2A3050";
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+function defaultArriveTime(): string {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() + 60);
+  const m = Math.round(d.getMinutes() / 5) * 5;
+  return `${pad2(d.getHours())}:${pad2(m % 60)}`;
+}
+
+/** HH:mm → 오늘 또는 내일 해당 시각의 Date */
+function buildArriveDate(timeHHmm: string): Date {
+  const [h, m] = timeHHmm.split(":").map(Number);
+  const now = new Date();
+  const arrive = new Date(now);
+  arrive.setHours(h, m, 0, 0);
+  if (arrive.getTime() <= now.getTime()) {
+    arrive.setDate(arrive.getDate() + 1);
+  }
+  return arrive;
+}
+
+function minutesUntilArrival(timeHHmm: string): number {
+  return Math.round((buildArriveDate(timeHHmm).getTime() - Date.now()) / 60000);
+}
+
+function formatArriveLabel(timeHHmm: string): string {
+  const arrive = buildArriveDate(timeHHmm);
+  const now = new Date();
+  const mins = minutesUntilArrival(timeHHmm);
+  const isTomorrow = arrive.getDate() !== now.getDate() || arrive.getMonth() !== now.getMonth();
+  const prefix = isTomorrow ? "내일 " : "";
+  return `${prefix}${formatTime12Label(timeHHmm)} 도착 · 약 ${mins}분`;
+}
+
+type TimeConstraintMode = "clock" | "duration";
+
+function formatDurationLabel(minutes: number) {
+  return `지금부터 ${minutes}분 이내 도착`;
+}
 
 export function InputPage({ onSearch }: InputPageProps) {
   const [origin, setOrigin] = useState("");
@@ -71,7 +119,9 @@ export function InputPage({ onSearch }: InputPageProps) {
   const [usePrice, setUsePrice] = useState(false);
   const [showOriginSug, setShowOriginSug] = useState(false);
   const [showDestSug, setShowDestSug] = useState(false);
-  const [allowedMinutes, setAllowedMinutes] = useState<number>(60);
+  const [timeMode, setTimeMode] = useState<TimeConstraintMode>("duration");
+  const [arriveTime, setArriveTime] = useState(defaultArriveTime);
+  const [allowedMinutes, setAllowedMinutes] = useState(60);
   const [loading, setLoading] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -141,13 +191,26 @@ export function InputPage({ onSearch }: InputPageProps) {
       const destData = await destRes.json();
 
       const now = new Date();
-      const arriveDate = new Date(now.getTime() + allowedMinutes * 60000);
+      let arriveDate: Date | null = null;
+      if (useTime) {
+        if (timeMode === "duration") {
+          if (allowedMinutes < 10) {
+            throw new Error("허용 시간은 최소 10분 이상이어야 합니다.");
+          }
+          arriveDate = new Date(now.getTime() + allowedMinutes * 60000);
+        } else {
+          const mins = minutesUntilArrival(arriveTime);
+          if (mins < 10) {
+            throw new Error("도착 시각은 현재 시각보다 10분 이후여야 합니다.");
+          }
+          arriveDate = buildArriveDate(arriveTime);
+        }
+      }
 
-      const pad = (n: number) => String(n).padStart(2, "0");
       const fmt = (d: Date) =>
-        `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00+0900`;
+        `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00+0900`;
       const departTime = fmt(now);
-      const arriveByISO = useTime ? fmt(arriveDate) : null;
+      const arriveByISO = arriveDate ? fmt(arriveDate) : null;
 
       onSearch({
         origin: { address: originData.address, lat: originData.lat, lon: originData.lon },
@@ -168,8 +231,8 @@ export function InputPage({ onSearch }: InputPageProps) {
       <OptiHeader />
       <main className="flex-1 px-5 pb-8 flex flex-col gap-3">
         <div className="mb-2">
-          <h1 style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1.25, color: TEXT, letterSpacing: "-0.03em" }}>
-            어디서 택시로<br />갈아탈까?
+          <h1 style={{ fontSize: "1.125rem", fontWeight: 700, lineHeight: 1.25, color: TEXT, letterSpacing: "-0.03em" }}>
+            어디서 택시로 갈아탈까?
           </h1>
           <p style={{ fontSize: "0.875rem", color: MUTED, marginTop: "6px" }}>파레토 최적 환승 지점 찾기</p>
           {(geoError || searchError) && (
@@ -194,21 +257,37 @@ export function InputPage({ onSearch }: InputPageProps) {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {origin && (
-                <button onClick={() => setOrigin("")} className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.08)" }}>
+                <button onClick={() => setOrigin("")} className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(180deg, #4A5268 0%, #353D52 100%)", boxShadow: SHADOW_ICON, border: "1px solid rgba(255,255,255,0.08)" }}>
                   <X size={10} style={{ color: MUTED }} />
                 </button>
               )}
-              <button onClick={handleCurrentLocation} disabled={gpsLoading} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: `rgba(76,200,240,0.12)` }}>
-                {gpsLoading
-                  ? <Loader2 size={13} className="animate-spin" style={{ color: CYAN }} />
-                  : <Navigation size={13} style={{ color: CYAN }} />}
+              <button
+                onClick={handleCurrentLocation}
+                disabled={gpsLoading}
+                className="flex flex-col items-center flex-shrink-0"
+                style={{ gap: "8px" }}
+                aria-label="내 위치"
+              >
+                <span
+                  className="w-7 h-7 rounded-full flex items-center justify-center"
+                  style={{ background: "linear-gradient(180deg, rgba(76,200,240,0.28) 0%, rgba(76,200,240,0.12) 100%)", boxShadow: SHADOW_ICON_ACCENT, border: "1px solid rgba(76,200,240,0.25)" }}
+                >
+                  {gpsLoading ? (
+                    <Loader2 size={13} className="animate-spin" style={{ color: CYAN }} />
+                  ) : (
+                    <Navigation size={13} style={{ color: CYAN }} />
+                  )}
+                </span>
+                <span style={{ fontSize: "0.5625rem", color: MUTED, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
+                  내 위치
+                </span>
               </button>
             </div>
             {showOriginSug && originResults.length > 0 && (
               <div className="absolute left-0 right-0 top-full z-30 rounded-b-2xl shadow-2xl overflow-hidden" style={{ background: CARD, border: `1px solid ${BORDER}`, borderTop: "none" }}>
                 {originResults.map((p) => (
                   <button key={p.id} className="w-full text-left px-4 py-3 flex items-start gap-3" style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}
-                    onMouseDown={() => { setOrigin(p.address_name); setShowOriginSug(false); }}>
+                    onMouseDown={() => { setOrigin(p.place_name || p.address_name); setShowOriginSug(false); }}>
                     <Search size={12} style={{ color: MUTED, marginTop: "4px", flexShrink: 0 }} />
                     <div className="flex flex-col min-w-0">
                       <span className="truncate" style={{ fontSize: "0.875rem", fontWeight: 700, color: TEXT }}>{p.place_name}</span>
@@ -234,7 +313,7 @@ export function InputPage({ onSearch }: InputPageProps) {
                 onBlur={() => setTimeout(() => setShowDestSug(false), 150)} />
             </div>
             {destination && (
-              <button onClick={() => setDestination("")} className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.08)" }}>
+              <button onClick={() => setDestination("")} className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(180deg, #4A5268 0%, #353D52 100%)", boxShadow: SHADOW_ICON, border: "1px solid rgba(255,255,255,0.08)" }}>
                 <X size={10} style={{ color: MUTED }} />
               </button>
             )}
@@ -242,7 +321,7 @@ export function InputPage({ onSearch }: InputPageProps) {
               <div className="absolute left-0 right-0 top-full z-30 rounded-b-2xl shadow-2xl overflow-hidden" style={{ background: CARD, border: `1px solid ${BORDER}`, borderTop: "none" }}>
                 {destResults.map((p) => (
                   <button key={p.id} className="w-full text-left px-4 py-3 flex items-start gap-3" style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}
-                    onMouseDown={() => { setDestination(p.address_name); setShowDestSug(false); }}>
+                    onMouseDown={() => { setDestination(p.place_name || p.address_name); setShowDestSug(false); }}>
                     <Search size={12} style={{ color: MUTED, marginTop: "4px", flexShrink: 0 }} />
                     <div className="flex flex-col min-w-0">
                       <span className="truncate" style={{ fontSize: "0.875rem", fontWeight: 700, color: TEXT }}>{p.place_name}</span>
@@ -258,29 +337,73 @@ export function InputPage({ onSearch }: InputPageProps) {
         <div className="rounded-2xl overflow-hidden" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <div style={{ borderBottom: `1px solid ${BORDER}` }}>
             <button className="w-full flex items-center gap-3 px-4 py-4 transition-all" onClick={() => setUseTime((v) => !v)}>
-              <div className="w-11 h-6 rounded-full flex-shrink-0 flex items-center px-0.5 transition-all" style={{ background: useTime ? CYAN : "rgba(255,255,255,0.08)" }}>
-                <div className="w-5 h-5 rounded-full transition-all" style={{ background: useTime ? "#0B0D1F" : "#2A3450", transform: useTime ? "translateX(20px)" : "translateX(0)" }} />
+              <div className="w-11 h-6 rounded-full flex-shrink-0 flex items-center px-0.5 transition-all" style={toggleTrackStyle(useTime)}>
+                <div className="w-5 h-5 rounded-full transition-all" style={{ ...toggleKnobStyle(), background: useTime ? "#0B0D1F" : "linear-gradient(180deg, #5A6478 0%, #2A3450 100%)", transform: useTime ? "translateX(20px)" : "translateX(0)" }} />
               </div>
               <div className="flex-1 text-left">
                 <p style={{ fontSize: "0.9rem", fontWeight: 600, color: useTime ? TEXT : MUTED }}>도착 희망 시각</p>
-                {useTime && <p style={{ fontSize: "0.75rem", color: CYAN, marginTop: "1px" }}>지금부터 {allowedMinutes}분 이내</p>}
+                {useTime && (
+                  <p style={{ fontSize: "0.75rem", color: CYAN, marginTop: "1px" }}>
+                    {timeMode === "duration"
+                      ? formatDurationLabel(allowedMinutes)
+                      : formatArriveLabel(arriveTime)}
+                  </p>
+                )}
               </div>
             </button>
             {useTime && (
               <div className="px-4 pb-4">
-                <input type="range" min={10} max={120} step={5} value={allowedMinutes}
-                  onChange={(e) => setAllowedMinutes(Number(e.target.value))} className="w-full accent-primary" />
-                <div className="flex justify-between mt-1">
-                  <span style={{ fontSize: "0.75rem", color: "#2A3450" }}>10분</span>
-                  <span style={{ fontSize: "0.75rem", color: "#2A3450" }}>120분</span>
+                <div className="flex gap-1 p-1 mb-3 rounded-2xl" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${BORDER}` }}>
+                  {([
+                    ["duration", "소요 시간"],
+                    ["clock", "시각 지정"],
+                  ] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setTimeMode(mode)}
+                      className="flex-1 py-2 rounded-xl transition-all active:scale-[0.98]"
+                      style={{
+                        ...sortTabStyle(timeMode === mode),
+                        background: timeMode === mode ? undefined : "transparent",
+                        color: timeMode === mode ? "#0B0D1F" : MUTED,
+                        fontSize: "0.8125rem",
+                        fontWeight: timeMode === mode ? 700 : 500,
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
+                {timeMode === "clock" ? (
+                  <TimePicker value={arriveTime} onChange={setArriveTime} />
+                ) : (
+                  <>
+                    <p style={{ fontSize: "0.75rem", color: MUTED, marginBottom: "8px", fontWeight: 600 }}>
+                      지금부터 <span style={{ color: CYAN, fontWeight: 800 }}>{allowedMinutes}분</span> 이내 도착
+                    </p>
+                    <input
+                      type="range"
+                      min={10}
+                      max={120}
+                      step={5}
+                      value={allowedMinutes}
+                      onChange={(e) => setAllowedMinutes(Number(e.target.value))}
+                      className="w-full accent-primary"
+                    />
+                    <div className="flex justify-between mt-1">
+                      <span style={{ fontSize: "0.75rem", color: MUTED }}>10분</span>
+                      <span style={{ fontSize: "0.75rem", color: MUTED }}>120분</span>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
           <div>
             <button className="w-full flex items-center gap-3 px-4 py-4 transition-all" onClick={() => setUsePrice((v) => !v)}>
-              <div className="w-11 h-6 rounded-full flex-shrink-0 flex items-center px-0.5 transition-all" style={{ background: usePrice ? CYAN : "rgba(255,255,255,0.08)" }}>
-                <div className="w-5 h-5 rounded-full transition-all" style={{ background: usePrice ? "#0B0D1F" : "#2A3450", transform: usePrice ? "translateX(20px)" : "translateX(0)" }} />
+              <div className="w-11 h-6 rounded-full flex-shrink-0 flex items-center px-0.5 transition-all" style={toggleTrackStyle(usePrice)}>
+                <div className="w-5 h-5 rounded-full transition-all" style={{ ...toggleKnobStyle(), background: usePrice ? "#0B0D1F" : "linear-gradient(180deg, #5A6478 0%, #2A3450 100%)", transform: usePrice ? "translateX(20px)" : "translateX(0)" }} />
               </div>
               <div className="flex-1 text-left">
                 <p style={{ fontSize: "0.9rem", fontWeight: 600, color: usePrice ? TEXT : MUTED }}>최대 금액</p>
@@ -301,8 +424,13 @@ export function InputPage({ onSearch }: InputPageProps) {
         </div>
 
         <button disabled={!canSearch || loading} onClick={handleSearch}
-          className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 transition-all"
-          style={{ background: canSearch && !loading ? CYAN : DEEP, color: canSearch && !loading ? "#0B0D1F" : "#2A3450", fontSize: "0.9375rem", fontWeight: 700, boxShadow: canSearch && !loading ? `0 8px 32px rgba(76,200,240,0.3)` : "none" }}>
+          className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:translate-y-[2px] active:shadow-none disabled:active:translate-y-0"
+          style={{
+            ...primaryButtonStyle(canSearch && !loading),
+            color: canSearch && !loading ? "#0B0D1F" : "#2A3450",
+            fontSize: "0.9375rem",
+            fontWeight: 700,
+          }}>
           <span>{loading ? "주소 확인 중..." : "최적 경로 찾기"}</span>
           {canSearch && !loading && <ArrowRight size={16} />}
         </button>

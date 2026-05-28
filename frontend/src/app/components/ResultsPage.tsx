@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowLeft, Clock, Wallet, Zap } from "lucide-react";
 import { Recommendation } from "./mockData";
 import { OptiHeader } from "./OptiHeader";
+import { SHADOW_CARD_BTN, SHADOW_CARD_BTN_HOVER, SHADOW_ICON, sortTabStyle } from "../buttonStyles";
 
 interface ResultsPageProps {
   data: {
@@ -39,7 +40,7 @@ export function ResultsPage({ data, onBack, onSelectCard }: ResultsPageProps) {
     <div className="min-h-screen flex flex-col" style={{ background: BG }}>
       <OptiHeader
         right={
-          <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}` }}>
+          <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95" style={{ background: "linear-gradient(180deg, #404A60 0%, #353D52 100%)", boxShadow: SHADOW_ICON, border: `1px solid ${BORDER}` }}>
             <ArrowLeft size={14} style={{ color: "#8A9BBF" }} />
           </button>
         }
@@ -62,8 +63,13 @@ export function ResultsPage({ data, onBack, onSelectCard }: ResultsPageProps) {
         <div className="flex gap-1 p-1 rounded-2xl" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           {([["weighted", "추천순"], ["price", "비용순"], ["time", "시간순"]] as const).map(([key, label]) => (
             <button key={key} onClick={() => setSortKey(key)}
-              className="flex-1 py-2 rounded-xl transition-all"
-              style={{ background: sortKey === key ? CYAN : "transparent", color: sortKey === key ? "#0B0D1F" : MUTED, fontSize: "0.8125rem", fontWeight: sortKey === key ? 700 : 500, boxShadow: sortKey === key ? `0 2px 12px rgba(76,200,240,0.3)` : "none" }}>
+              className="flex-1 py-2 rounded-xl transition-all active:scale-[0.98]"
+              style={{
+                ...(sortKey === key ? sortTabStyle(true) : { background: "transparent" }),
+                color: sortKey === key ? "#0B0D1F" : MUTED,
+                fontSize: "0.8125rem",
+                fontWeight: sortKey === key ? 700 : 500,
+              }}>
               {label}
             </button>
           ))}
@@ -104,13 +110,13 @@ function BaselineCard({ icon, label, minutes, price, accent }: { icon: string; l
 function RecommendCard({ rec, dimmed, overLabel, onClick }: { rec: Recommendation; dimmed: boolean; overLabel?: string; onClick: () => void }) {
   const transitRatio = rec.transit_segment.minutes / rec.total_minutes;
   return (
-    <button onClick={onClick} className="w-full text-left rounded-2xl p-4 transition-all active:scale-[0.99]"
-      style={{ background: CARD, border: `1px solid ${BORDER}`, opacity: dimmed ? 0.35 : 1 }}
-      onMouseEnter={e => !dimmed && (e.currentTarget.style.borderColor = `rgba(76,200,240,0.3)`)}
-      onMouseLeave={e => (e.currentTarget.style.borderColor = BORDER)}>
+    <button onClick={onClick} className="w-full text-left rounded-2xl p-4 transition-all active:scale-[0.98] active:translate-y-[1px]"
+      style={{ background: `linear-gradient(180deg, #2E3548 0%, ${CARD} 100%)`, border: `1px solid ${BORDER}`, boxShadow: SHADOW_CARD_BTN, opacity: dimmed ? 0.35 : 1 }}
+      onMouseEnter={e => { if (!dimmed) { e.currentTarget.style.boxShadow = SHADOW_CARD_BTN_HOVER; e.currentTarget.style.borderColor = "rgba(76,200,240,0.3)"; } }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = SHADOW_CARD_BTN; e.currentTarget.style.borderColor = BORDER; }}>
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5">
-          <span className="inline-flex px-2 py-0.5 rounded-full text-white font-bold" style={{ background: "#34C759", fontSize: "0.7rem" }}>{rec.rank}순위</span>
+          <span className="inline-flex px-2 py-0.5 rounded-full text-white font-bold" style={{ background: "linear-gradient(180deg, #4AE07A 0%, #34C759 100%)", boxShadow: "0 1px 0 rgba(255,255,255,0.3) inset, 0 2px 6px rgba(52,199,89,0.45)", fontSize: "0.7rem" }}>{rec.rank}순위</span>
           {overLabel && <span className="inline-flex px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(255,59,48,0.12)", color: "#FF3B30", fontSize: "0.7rem" }}>{overLabel}</span>}
         </div>
         <div className="flex items-baseline gap-1">
