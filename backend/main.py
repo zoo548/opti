@@ -98,12 +98,35 @@ def reverse_geocode(lat: float, lon: float):
 
 @app.post("/geocode")
 def geocode(req: GeocodeRequest):
-    """주소 → 위경도 변환 (Kakao REST API)"""
+    """주소/장소명 → 위경도 변환 (Kakao REST API)"""
     api_key = os.environ.get("KAKAO_REST_API_KEY", "")
-    lat, lon, matched, status = geocode_kakao(req.address, api_key)
+    address = (req.address or "").strip()
+
+    if not api_key:
+        logger.error("Kakao /geocode: KAKAO_REST_API_KEY not set")
+        raise HTTPException(status_code=503, detail="KAKAO_REST_API_KEY가 설정되지 않았습니다.")
+    if not address:
+        logger.warning("Kakao /geocode: empty address in request")
+        raise HTTPException(status_code=400, detail="주소가 비어 있습니다.")
+
+    lat, lon, matched, status = geocode_kakao(address, api_key)
     if status != "성공":
+        logger.error(
+            "Kakao /geocode failed address=%r status=%s key_len=%d",
+            address,
+            status,
+            len(api_key),
+        )
+        if status == "API키없음" or "401" in status or status.startswith("Kakao 인증"):
+            raise HTTPException(status_code=502, detail=f"주소 변환 실패: {status}")
         raise HTTPException(status_code=400, detail=f"주소 변환 실패: {status}")
-    return {"address": matched, "lat": float(lat), "lon": float(lon)}
+
+    if lat is None or lon is None:
+        logger.error("Kakao /geocode: missing coords address=%r", address)
+        raise HTTPException(status_code=502, detail="좌표를 가져오지 못했습니다.")
+
+    logger.info("Kakao /geocode ok address=%r -> (%s, %s)", address, lat, lon)
+    return {"address": matched or address, "lat": float(lat), "lon": float(lon)}
 
 
 @app.post("/analyze")
