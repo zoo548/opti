@@ -157,6 +157,7 @@ def analyze(req: AnalyzeRequest):
             odsay_key=os.environ.get("ODSAY_API_KEY", ""),
         )
     except Exception as e:
+        logger.exception("run_simulation failed")
         raise HTTPException(status_code=502, detail=f"경로 분석 실패: {str(e)}")
 
     # 3. 가중치 적용
