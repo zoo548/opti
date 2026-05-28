@@ -13,12 +13,12 @@
   --secondary: #222640;
   --secondary-foreground: #E8F0FF;
   --muted: #222640;
-  --muted-foreground: #6B7A99;
+  --muted-foreground: #FFFFFF;
   --accent: #243050;
   --accent-foreground: #4CC8F0;
   --destructive: #FF3B30;
   --destructive-foreground: #FFFFFF;
-  --border: rgba(255,255,255,0.09);
+  --border: rgba(255,255,255,0.24);
   --input: transparent;
   --input-background: #222640;
   --switch-background: #2E3558;

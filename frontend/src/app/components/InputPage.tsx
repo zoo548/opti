@@ -67,9 +67,10 @@ function useKakaoSearch(query: string, onError: (msg: string | null) => void) {
 const CYAN = "#4CC8F0";
 const CARD = "#252A42";
 const BG = "#1C2035";
-const BORDER = "rgba(255,255,255,0.1)";
+const BORDER = "rgba(255,255,255,0.24)";
+const BORDER_SUBTLE = "rgba(255,255,255,0.14)";
 const TEXT = "#E8F0FF";
-const MUTED = "#7A8BAA";
+const MUTED = "#FFFFFF";
 const DEEP = "#2A3050";
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
@@ -230,11 +231,11 @@ export function InputPage({ onSearch }: InputPageProps) {
     <div className="min-h-screen flex flex-col" style={{ background: BG }}>
       <OptiHeader />
       <main className="flex-1 px-5 pb-8 flex flex-col gap-3">
-        <div className="mb-2">
-          <h1 style={{ fontSize: "1.125rem", fontWeight: 700, lineHeight: 1.25, color: TEXT, letterSpacing: "-0.03em" }}>
-            어디서 택시로 갈아탈까?
+        <div className="mb-5 pl-3 relative top-5">
+          <p style={{ fontSize: "0.8125rem", color: "#7A8BAA", lineHeight: 1.25 }}>Pareto Optimal Hybrid Route</p>
+          <h1 style={{ fontSize: "1rem", fontWeight: 600, lineHeight: 1.25, color: "#9AADCC", letterSpacing: "-0.03em", marginTop: "5px" }}>
+            대중교통-택시 최적 환승 경로
           </h1>
-          <p style={{ fontSize: "0.875rem", color: MUTED, marginTop: "6px" }}>파레토 최적 환승 지점 찾기</p>
           {(geoError || searchError) && (
             <p style={{ fontSize: "0.75rem", color: "#FF3B30", marginTop: "4px" }}>{geoError ?? searchError}</p>
           )}
@@ -248,7 +249,7 @@ export function InputPage({ onSearch }: InputPageProps) {
             </div>
             <div className="flex-1 min-w-0">
               <p style={{ fontSize: "0.625rem", color: MUTED, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>출발</p>
-              <input className="w-full outline-none bg-transparent truncate placeholder:text-[#8A9BBF]"
+              <input className="w-full outline-none bg-transparent truncate placeholder:text-white/60"
                 style={{ fontSize: "0.9375rem", color: TEXT }}
                 placeholder="출발지를 입력하세요" value={origin}
                 onChange={(e) => { setOrigin(e.target.value); setShowOriginSug(e.target.value.length > 0); }}
@@ -286,7 +287,7 @@ export function InputPage({ onSearch }: InputPageProps) {
             {showOriginSug && originResults.length > 0 && (
               <div className="absolute left-0 right-0 top-full z-30 rounded-b-2xl shadow-2xl overflow-hidden" style={{ background: CARD, border: `1px solid ${BORDER}`, borderTop: "none" }}>
                 {originResults.map((p) => (
-                  <button key={p.id} className="w-full text-left px-4 py-3 flex items-start gap-3" style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}
+                  <button key={p.id} className="w-full text-left px-4 py-3 flex items-start gap-3" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
                     onMouseDown={() => { setOrigin(p.place_name || p.address_name); setShowOriginSug(false); }}>
                     <Search size={12} style={{ color: MUTED, marginTop: "4px", flexShrink: 0 }} />
                     <div className="flex flex-col min-w-0">
@@ -305,7 +306,7 @@ export function InputPage({ onSearch }: InputPageProps) {
             </div>
             <div className="flex-1 min-w-0">
               <p style={{ fontSize: "0.625rem", color: MUTED, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>도착</p>
-              <input className="w-full outline-none bg-transparent truncate placeholder:text-[#8A9BBF]"
+              <input className="w-full outline-none bg-transparent truncate placeholder:text-white/60"
                 style={{ fontSize: "0.9375rem", color: TEXT }}
                 placeholder="도착지를 입력하세요" value={destination}
                 onChange={(e) => { setDestination(e.target.value); setShowDestSug(e.target.value.length > 0); }}
@@ -320,7 +321,7 @@ export function InputPage({ onSearch }: InputPageProps) {
             {showDestSug && destResults.length > 0 && (
               <div className="absolute left-0 right-0 top-full z-30 rounded-b-2xl shadow-2xl overflow-hidden" style={{ background: CARD, border: `1px solid ${BORDER}`, borderTop: "none" }}>
                 {destResults.map((p) => (
-                  <button key={p.id} className="w-full text-left px-4 py-3 flex items-start gap-3" style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}
+                  <button key={p.id} className="w-full text-left px-4 py-3 flex items-start gap-3" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
                     onMouseDown={() => { setDestination(p.place_name || p.address_name); setShowDestSug(false); }}>
                     <Search size={12} style={{ color: MUTED, marginTop: "4px", flexShrink: 0 }} />
                     <div className="flex flex-col min-w-0">
@@ -356,7 +357,7 @@ export function InputPage({ onSearch }: InputPageProps) {
                 <div className="flex gap-1 p-1 mb-3 rounded-2xl" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${BORDER}` }}>
                   {([
                     ["duration", "소요 시간"],
-                    ["clock", "시각 지정"],
+                    ["clock", "시각 선택"],
                   ] as const).map(([mode, label]) => (
                     <button
                       key={mode}
@@ -415,8 +416,8 @@ export function InputPage({ onSearch }: InputPageProps) {
                 <input type="range" min={5000} max={50000} step={1000} value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))} className="w-full accent-primary" />
                 <div className="flex justify-between mt-1">
-                  <span style={{ fontSize: "0.75rem", color: "#2A3450" }}>5,000원</span>
-                  <span style={{ fontSize: "0.75rem", color: "#2A3450" }}>50,000원</span>
+                  <span style={{ fontSize: "0.75rem", color: MUTED }}>5,000원</span>
+                  <span style={{ fontSize: "0.75rem", color: MUTED }}>50,000원</span>
                 </div>
               </div>
             )}
@@ -427,7 +428,7 @@ export function InputPage({ onSearch }: InputPageProps) {
           className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:translate-y-[2px] active:shadow-none disabled:active:translate-y-0"
           style={{
             ...primaryButtonStyle(canSearch && !loading),
-            color: canSearch && !loading ? "#0B0D1F" : "#2A3450",
+            color: canSearch && !loading ? "#0B0D1F" : "rgba(255,255,255,0.45)",
             fontSize: "0.9375rem",
             fontWeight: 700,
           }}>

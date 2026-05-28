@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 
 const CYAN = "#4CC8F0";
-const BORDER = "rgba(255,255,255,0.1)";
-const MUTED = "#7A8BAA";
+const BORDER = "rgba(255,255,255,0.24)";
+const MUTED = "#FFFFFF";
 
 const HOURS_12 = Array.from({ length: 12 }, (_, i) => i + 1);
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);

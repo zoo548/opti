@@ -22,9 +22,9 @@ type SortKey = "weighted" | "price" | "time";
 const CYAN = "#4CC8F0";
 const CARD = "#252A42";
 const BG = "#1C2035";
-const BORDER = "rgba(255,255,255,0.1)";
+const BORDER = "rgba(255,255,255,0.24)";
 const TEXT = "#E8F0FF";
-const MUTED = "#7A8BAA";
+const MUTED = "#FFFFFF";
 
 export function ResultsPage({ data, onBack, onSelectCard }: ResultsPageProps) {
   const [sortKey, setSortKey] = useState<SortKey>("weighted");
@@ -41,7 +41,7 @@ export function ResultsPage({ data, onBack, onSelectCard }: ResultsPageProps) {
       <OptiHeader
         right={
           <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95" style={{ background: "linear-gradient(180deg, #404A60 0%, #353D52 100%)", boxShadow: SHADOW_ICON, border: `1px solid ${BORDER}` }}>
-            <ArrowLeft size={14} style={{ color: "#8A9BBF" }} />
+            <ArrowLeft size={14} style={{ color: MUTED }} />
           </button>
         }
       />
@@ -88,7 +88,7 @@ export function ResultsPage({ data, onBack, onSelectCard }: ResultsPageProps) {
 
 function Chip({ icon, label, glow }: { icon: React.ReactNode; label: string; glow?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ background: glow ? `rgba(76,200,240,0.1)` : "rgba(255,255,255,0.05)", color: glow ? CYAN : "#8A9BBF", fontSize: "0.75rem", fontWeight: 600, border: glow ? `1px solid rgba(76,200,240,0.2)` : `1px solid ${BORDER}` }}>
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ background: glow ? `rgba(76,200,240,0.1)` : "rgba(255,255,255,0.05)", color: glow ? CYAN : MUTED, fontSize: "0.75rem", fontWeight: 600, border: glow ? `1px solid rgba(76,200,240,0.2)` : `1px solid ${BORDER}` }}>
       {icon}{label}
     </span>
   );
@@ -102,7 +102,7 @@ function BaselineCard({ icon, label, minutes, price, accent }: { icon: string; l
         <span style={{ fontSize: "0.75rem", color: MUTED, fontWeight: 600 }}>{label}</span>
       </div>
       <p className="font-black" style={{ fontSize: "1.5rem", color: accent, lineHeight: 1, textShadow: `0 0 16px ${accent}60` }}>{minutes}분</p>
-      <p className="mt-1" style={{ fontSize: "0.8125rem", color: "#2A3450" }}>{price.toLocaleString()}원</p>
+      <p className="mt-1" style={{ fontSize: "0.8125rem", color: MUTED }}>{price.toLocaleString()}원</p>
     </div>
   );
 }
@@ -121,11 +121,11 @@ function RecommendCard({ rec, dimmed, overLabel, onClick }: { rec: Recommendatio
         </div>
         <div className="flex items-baseline gap-1">
           <span style={{ fontSize: "1.125rem", fontWeight: 800, color: TEXT }}>{rec.total_minutes}분</span>
-          <span style={{ color: "#2A3450" }}>·</span>
+          <span style={{ color: MUTED }}>·</span>
           <span style={{ fontSize: "1.125rem", fontWeight: 800, color: TEXT }}>{rec.price.toLocaleString()}원</span>
         </div>
       </div>
-      <p style={{ fontSize: "0.875rem", color: "#8A9BBF", fontWeight: 600 }} className="mb-3">📍 {rec.transfer_point} 환승</p>
+      <p style={{ fontSize: "0.875rem", color: MUTED, fontWeight: 600 }} className="mb-3">📍 {rec.transfer_point} 환승</p>
       <div className="mb-3">
         <div className="flex rounded-full overflow-hidden mb-2" style={{ height: "7px" }}>
           <div style={{ flex: transitRatio, background: CYAN, borderRadius: "4px 0 0 4px", boxShadow: `0 0 8px ${CYAN}60` }} />
@@ -142,7 +142,7 @@ function RecommendCard({ rec, dimmed, overLabel, onClick }: { rec: Recommendatio
           </span>
         </div>
       </div>
-      <div className="flex gap-4 pt-3" style={{ borderTop: `1px solid rgba(255,255,255,0.05)` }}>
+      <div className="flex gap-4 pt-3" style={{ borderTop: `1px solid rgba(255,255,255,0.14)` }}>
         <span style={{ fontSize: "0.75rem", color: CYAN, fontWeight: 600 }}>🚇 -{rec.savings.vs_transit_minutes}분 단축</span>
         <span style={{ fontSize: "0.75rem", color: "#F5A623", fontWeight: 600 }}>🚕 -{rec.savings.vs_taxi_price.toLocaleString()}원 절약</span>
       </div>

@@ -8,30 +8,34 @@ interface OptiHeaderProps {
 
 export function OptiHeader({ sub, right }: OptiHeaderProps) {
   return (
-    <div className="relative pt-12 pb-4">
-      {/* Right slot — absolute so logo stays centered */}
+    <header className="flex items-center justify-between px-5 pt-6 pb-3">
+      <ImageWithFallback
+        src={logo}
+        alt="Opti"
+        style={{
+          height: "64px",
+          width: "auto",
+          opacity: 0.92,
+          mixBlendMode: "lighten",
+          filter: "drop-shadow(0 0 16px rgba(76,200,240,0.18))",
+          maskImage:
+            "linear-gradient(to right, black 75%, transparent 100%), linear-gradient(to bottom, black 88%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to right, black 75%, transparent 100%), linear-gradient(to bottom, black 88%, transparent 100%)",
+          maskComposite: "intersect",
+          WebkitMaskComposite: "source-in",
+        }}
+      />
       {(sub || right) && (
-        <div className="absolute right-5 top-12 flex items-center gap-3">
-          {sub && <span style={{ fontSize: "0.75rem", color: "#5A6A8A" }}>{sub}</span>}
+        <div className="flex items-center gap-3">
+          {sub && (
+            <span style={{ fontSize: "0.75rem", color: "#FFFFFF", fontWeight: 600 }}>
+              {sub}
+            </span>
+          )}
           {right}
         </div>
       )}
-
-      {/* Centered logo */}
-      <div className="flex justify-center">
-        <ImageWithFallback
-          src={logo}
-          alt="Opti — Optimal Route Finder"
-          style={{
-            height: "100px",
-            width: "auto",
-            maskImage: "linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%), linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
-            maskComposite: "intersect",
-            WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%), linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
-            WebkitMaskComposite: "source-in",
-          }}
-        />
-      </div>
-    </div>
+    </header>
   );
 }

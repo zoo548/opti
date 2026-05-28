@@ -16,9 +16,9 @@ const CYAN = "#4CC8F0";
 const AMBER = "#F5A623";
 const CARD = "#252A42";
 const BG = "#1C2035";
-const BORDER = "rgba(255,255,255,0.1)";
+const BORDER = "rgba(255,255,255,0.24)";
 const TEXT = "#E8F0FF";
-const MUTED = "#7A8BAA";
+const MUTED = "#FFFFFF";
 
 export function DetailPage({ rec, baselines, onBack }: DetailPageProps) {
   const transitPct = Math.round((rec.transit_segment.minutes / rec.total_minutes) * 100);
@@ -29,7 +29,7 @@ export function DetailPage({ rec, baselines, onBack }: DetailPageProps) {
       <OptiHeader
         right={
           <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95" style={{ background: "linear-gradient(180deg, #404A60 0%, #353D52 100%)", boxShadow: SHADOW_ICON, border: `1px solid ${BORDER}` }}>
-            <ArrowLeft size={14} style={{ color: "#8A9BBF" }} />
+            <ArrowLeft size={14} style={{ color: MUTED }} />
           </button>
         }
       />
@@ -82,7 +82,7 @@ export function DetailPage({ rec, baselines, onBack }: DetailPageProps) {
           <div className="flex flex-col gap-2.5">
             <CostRow label="대중교통 요금" amount={rec.transit_segment.price} color={CYAN} />
             <CostRow label="택시 요금" amount={rec.taxi_segment.price} color={AMBER} />
-            <div className="pt-2.5" style={{ borderTop: `1px solid rgba(255,255,255,0.05)` }}>
+            <div className="pt-2.5" style={{ borderTop: `1px solid rgba(255,255,255,0.14)` }}>
               <CostRow label="합계" amount={rec.price} bold />
             </div>
           </div>
@@ -157,7 +157,7 @@ function CompareRow({ icon, label, sub, badge, badgeColor, note, glow, border }:
   return (
     <div className="flex items-center justify-between px-3 py-3 rounded-xl" style={{ background: glow, border: `1px solid ${border}` }}>
       <div>
-        <p style={{ fontSize: "0.8125rem", color: "#8A9BBF", fontWeight: 600 }}>{icon} {label}</p>
+        <p style={{ fontSize: "0.8125rem", color: MUTED, fontWeight: 600 }}>{icon} {label}</p>
         <p style={{ fontSize: "0.75rem", color: MUTED }}>{sub}</p>
       </div>
       <div className="text-right">

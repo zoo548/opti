@@ -14,9 +14,9 @@ const STEPS = [
 const CYAN = "#4CC8F0";
 const CARD = "#252A42";
 const BG = "#1C2035";
-const BORDER = "rgba(255,255,255,0.1)";
+const BORDER = "rgba(255,255,255,0.24)";
 const TEXT = "#E8F0FF";
-const MUTED = "#7A8BAA";
+const MUTED = "#FFFFFF";
 const DEEP = "#2A3050";
 
 interface LoadingPageProps {
@@ -109,12 +109,12 @@ export function LoadingPage({ onDone, origin, destination, allowedMinutes }: Loa
             <div className="flex flex-col gap-1.5 flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: CYAN, boxShadow: `0 0 5px ${CYAN}80` }} />
-                <span className="truncate" style={{ fontSize: "0.8125rem", color: "#8A9BBF" }}>{origin ?? "출발지"}</span>
+                <span className="truncate" style={{ fontSize: "0.8125rem", color: MUTED }}>{origin ?? "출발지"}</span>
               </div>
               <div className="w-px h-3 ml-1" style={{ background: "rgba(255,255,255,0.1)" }} />
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: CYAN, boxShadow: `0 0 5px ${CYAN}80` }} />
-                <span className="truncate" style={{ fontSize: "0.8125rem", color: "#8A9BBF" }}>{destination ?? "도착지"}</span>
+                <span className="truncate" style={{ fontSize: "0.8125rem", color: MUTED }}>{destination ?? "도착지"}</span>
               </div>
             </div>
             {allowedMinutes != null && allowedMinutes > 0 && (
