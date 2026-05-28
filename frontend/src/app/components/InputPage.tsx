@@ -14,7 +14,6 @@ interface KakaoPlace {
   road_address_name?: string;
 }
 
-const KAKAO_KEY = import.meta.env.VITE_KAKAO_REST_API_KEY ?? "";
 const BACKEND = import.meta.env.VITE_BACKEND_URL ?? "http://127.0.0.1:8000";
 
 function useKakaoSearch(query: string) {
@@ -29,10 +28,9 @@ function useKakaoSearch(query: string) {
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
-          `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=5`,
-          { headers: { Authorization: `KakaoAK ${KAKAO_KEY}` } }
+          `${BACKEND}/search?q=${encodeURIComponent(query)}`
         );
-        if (!res.ok) throw new Error(`Kakao ${res.status}`);
+        if (!res.ok) throw new Error(`search ${res.status}`);
         const data = await res.json();
         if (!cancelled) setResults(data.documents ?? []);
       } catch {
@@ -86,15 +84,12 @@ export function InputPage({ onSearch }: InputPageProps) {
         const { latitude, longitude } = pos.coords;
         try {
           const res = await fetch(
-            `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${longitude}&y=${latitude}`,
-            { headers: { Authorization: `KakaoAK ${KAKAO_KEY}` } }
+            `${BACKEND}/reverse-geocode?lat=${latitude}&lon=${longitude}`
           );
-          if (!res.ok) throw new Error(`Kakao ${res.status}`);
+          if (!res.ok) throw new Error(`reverse-geocode ${res.status}`);
           const data = await res.json();
-          const doc = data.documents?.[0];
-          const addr = doc?.road_address?.address_name ?? doc?.address?.address_name;
-          if (addr) {
-            setOrigin(addr);
+          if (data.address && data.address !== "현재 위치") {
+            setOrigin(data.address);
           } else {
             setGeoError("현재 위치의 주소를 찾을 수 없습니다.");
           }

@@ -14,6 +14,7 @@ export interface Recommendation {
   price: number;
   transit_segment: {
     minutes: number;
+    walk_minutes?: number;
     transfers: number;
     price: number;
     lines: Segment[];

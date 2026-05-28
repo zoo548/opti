@@ -62,7 +62,9 @@ export function DetailPage({ rec, baselines, onBack }: DetailPageProps) {
         <div className="rounded-2xl p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <p style={{ fontSize: "0.875rem", fontWeight: 700, color: TEXT }} className="mb-4">전체 경로</p>
           <TLNode dot={CYAN} label="출발지" lineColor={CYAN} />
-          <TLLine label="🚶 도보" color={MUTED} />
+          {(rec.transit_segment.walk_minutes ?? 0) > 0 && (
+            <TLLine label={`🚶 도보 ${rec.transit_segment.walk_minutes}분`} color={MUTED} />
+          )}
           {rec.transit_segment.lines.map((line, i) => (
             <div key={i}>
               <TLNode dot={CYAN} label={`🚇 ${line.name} (${line.from})`} sub={`${line.to} 방면`} lineColor={CYAN} />

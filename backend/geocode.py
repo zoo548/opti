@@ -31,6 +31,22 @@ def geocode_kakao(address: str, api_key: str):
         matched_addr = first["road_address"].get("address_name")
     return lat, lon, matched_addr, "성공"
 
+def search_keyword_kakao(query: str, api_key: str, size: int = 5) -> list[dict]:
+    """키워드 장소 검색 (자동완성용)"""
+    if not api_key or len(query.strip()) < 2:
+        return []
+    url = "https://dapi.kakao.com/v2/local/search/keyword.json"
+    headers = {"Authorization": f"KakaoAK {api_key}"}
+    params = {"query": query.strip(), "size": size}
+    try:
+        resp = requests.get(url, headers=headers, params=params, timeout=10)
+        if resp.status_code != 200:
+            return []
+        return resp.json().get("documents", [])
+    except Exception:
+        return []
+
+
 def reverse_geocode_kakao(lat: float, lon: float, api_key: str) -> str:
     url = "https://dapi.kakao.com/v2/local/geo/coord2address.json"
     headers = {"Authorization": f"KakaoAK {api_key}"}

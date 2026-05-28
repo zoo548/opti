@@ -8,7 +8,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-from geocode import geocode_kakao
+from geocode import geocode_kakao, search_keyword_kakao, reverse_geocode_kakao
 from simulate import run_simulation
 from weight import apply_weights
 from pareto import extract_pareto
@@ -48,6 +48,35 @@ class GeocodeRequest(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/search")
+def search_places(q: str):
+    """키워드 장소 검색 (자동완성)"""
+    api_key = os.environ.get("KAKAO_REST_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="KAKAO_REST_API_KEY가 설정되지 않았습니다.")
+    docs = search_keyword_kakao(q, api_key)
+    return {
+        "documents": [
+            {
+                "id": d.get("id", ""),
+                "place_name": d.get("place_name", ""),
+                "address_name": d.get("address_name", ""),
+            }
+            for d in docs
+        ]
+    }
+
+
+@app.get("/reverse-geocode")
+def reverse_geocode(lat: float, lon: float):
+    """위경도 → 주소 (역지오코딩)"""
+    api_key = os.environ.get("KAKAO_REST_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="KAKAO_REST_API_KEY가 설정되지 않았습니다.")
+    address = reverse_geocode_kakao(lat, lon, api_key)
+    return {"address": address}
 
 
 @app.post("/geocode")
@@ -126,6 +155,9 @@ def analyze(req: AnalyzeRequest):
 
 
 def _build_recommendation(row: dict, rank: int) -> dict:
+    walk_min = row.get("walk_minutes", 0) or 0
+    transit_vehicle = row.get("transit_minutes", 0) or 0
+    transit_total = transit_vehicle + walk_min  # ODsay 구간 전체(도보 포함)
     return {
         "rank":             rank,
         "transfer_point":   row["transfer_point"],
@@ -133,10 +165,11 @@ def _build_recommendation(row: dict, rank: int) -> dict:
         "weighted_minutes": round(row["weighted_minutes"], 2),
         "price":            int(row["price"]),
         "transit_segment": {
-            "minutes":   round(row["transit_minutes"], 1),
-            "transfers": int(row.get("transit_transfers", 0)),
-            "price":     int(row.get("transit_price", 0)),
-            "lines":     row.get("lines", []),
+            "minutes":      round(transit_total, 1),
+            "walk_minutes": round(walk_min, 1),
+            "transfers":    int(row.get("transit_transfers", 0)),
+            "price":        int(row.get("transit_price", 0)),
+            "lines":        row.get("lines", []),
         },
         "taxi_segment": {
             "minutes": round(row["taxi_minutes"], 1),
