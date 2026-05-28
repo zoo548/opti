@@ -3,7 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -55,11 +58,22 @@ def search_places(q: str):
     """키워드 장소 검색 (자동완성)"""
     api_key = os.environ.get("KAKAO_REST_API_KEY", "")
     if not api_key:
+        logger.error("Kakao /search: KAKAO_REST_API_KEY not set")
         raise HTTPException(status_code=503, detail="KAKAO_REST_API_KEY가 설정되지 않았습니다.")
     try:
         docs = search_keyword_kakao(q, api_key)
     except ValueError as e:
+        logger.error(
+            "Kakao /search failed query=%r key_len=%d: %s",
+            q,
+            len(api_key),
+            e,
+            exc_info=True,
+        )
         raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Kakao /search unexpected error query=%r", q)
+        raise HTTPException(status_code=502, detail=f"검색 서버 오류: {e}") from e
     return {
         "documents": [
             {

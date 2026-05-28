@@ -43,9 +43,11 @@ def search_keyword_kakao(query: str, api_key: str, size: int = 5) -> list[dict]:
     except Exception as e:
         raise ValueError(f"Kakao 요청 실패: {e}") from e
     if resp.status_code == 401:
-        raise ValueError("Kakao API 키가 유효하지 않습니다 (401)")
+        raise ValueError(f"Kakao API 키가 유효하지 않습니다 (401): {resp.text[:500]}")
     if resp.status_code != 200:
-        raise ValueError(f"Kakao API 오류 (HTTP {resp.status_code})")
+        raise ValueError(
+            f"Kakao API 오류 (HTTP {resp.status_code}): {resp.text[:500]}"
+        )
     return resp.json().get("documents", [])
 
 
