@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Navigation, X, ArrowRight, Loader2 } from "lucide-react";
 import { OptiHeader } from "./OptiHeader";
 import { SearchParams } from "../App";
-import { BACKEND } from "../config";
+import { BACKEND } from "../../config";
 
 interface InputPageProps {
   onSearch: (params: SearchParams) => void;
