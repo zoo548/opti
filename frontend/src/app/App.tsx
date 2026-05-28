@@ -7,7 +7,7 @@ import { Recommendation } from "./components/mockData";
 
 type Page = "input" | "loading" | "results" | "detail";
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL ?? "http://127.0.0.1:8000";
+import { BACKEND } from "../config";
 
 export interface SearchParams {
   origin: { address: string; lat: number; lon: number };

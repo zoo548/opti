@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Navigation, X, ArrowRight, Loader2 } from "lucide-react";
 import { OptiHeader } from "./OptiHeader";
 import { SearchParams } from "../App";
+import { BACKEND } from "../config";
 
 interface InputPageProps {
   onSearch: (params: SearchParams) => void;
@@ -14,14 +15,13 @@ interface KakaoPlace {
   road_address_name?: string;
 }
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL ?? "http://127.0.0.1:8000";
-
-function useKakaoSearch(query: string) {
+function useKakaoSearch(query: string, onError: (msg: string | null) => void) {
   const [results, setResults] = useState<KakaoPlace[]>([]);
 
   useEffect(() => {
     if (query.trim().length < 2) {
       setResults([]);
+      onError(null);
       return;
     }
     let cancelled = false;
@@ -30,11 +30,20 @@ function useKakaoSearch(query: string) {
         const res = await fetch(
           `${BACKEND}/search?q=${encodeURIComponent(query)}`
         );
-        if (!res.ok) throw new Error(`search ${res.status}`);
-        const data = await res.json();
-        if (!cancelled) setResults(data.documents ?? []);
-      } catch {
-        if (!cancelled) setResults([]);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const detail = typeof data.detail === "string" ? data.detail : `검색 실패 (${res.status})`;
+          throw new Error(detail);
+        }
+        if (!cancelled) {
+          setResults(data.documents ?? []);
+          onError(null);
+        }
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setResults([]);
+          onError(e instanceof Error ? e.message : "자동완성 요청 실패");
+        }
       }
     }, 300);
 
@@ -42,7 +51,7 @@ function useKakaoSearch(query: string) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, onError]);
 
   return results;
 }
@@ -66,9 +75,10 @@ export function InputPage({ onSearch }: InputPageProps) {
   const [loading, setLoading] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  const originResults = useKakaoSearch(origin);
-  const destResults = useKakaoSearch(destination);
+  const originResults = useKakaoSearch(origin, setSearchError);
+  const destResults = useKakaoSearch(destination, setSearchError);
 
   const canSearch = origin.length > 0 && destination.length > 0 && (useTime || usePrice);
 
@@ -162,7 +172,9 @@ export function InputPage({ onSearch }: InputPageProps) {
             어디서 택시로<br />갈아탈까?
           </h1>
           <p style={{ fontSize: "0.875rem", color: MUTED, marginTop: "6px" }}>파레토 최적 환승 지점 찾기</p>
-          {geoError && <p style={{ fontSize: "0.75rem", color: "#FF3B30", marginTop: "4px" }}>{geoError}</p>}
+          {(geoError || searchError) && (
+            <p style={{ fontSize: "0.75rem", color: "#FF3B30", marginTop: "4px" }}>{geoError ?? searchError}</p>
+          )}
         </div>
 
         <div className="rounded-2xl overflow-visible" style={{ background: CARD, border: `1px solid ${BORDER}` }}>

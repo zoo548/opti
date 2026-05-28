@@ -56,7 +56,10 @@ def search_places(q: str):
     api_key = os.environ.get("KAKAO_REST_API_KEY", "")
     if not api_key:
         raise HTTPException(status_code=503, detail="KAKAO_REST_API_KEY가 설정되지 않았습니다.")
-    docs = search_keyword_kakao(q, api_key)
+    try:
+        docs = search_keyword_kakao(q, api_key)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
     return {
         "documents": [
             {

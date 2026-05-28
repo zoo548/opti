@@ -32,7 +32,7 @@ def geocode_kakao(address: str, api_key: str):
     return lat, lon, matched_addr, "성공"
 
 def search_keyword_kakao(query: str, api_key: str, size: int = 5) -> list[dict]:
-    """키워드 장소 검색 (자동완성용)"""
+    """키워드 장소 검색 (자동완성용). 실패 시 ValueError."""
     if not api_key or len(query.strip()) < 2:
         return []
     url = "https://dapi.kakao.com/v2/local/search/keyword.json"
@@ -40,11 +40,13 @@ def search_keyword_kakao(query: str, api_key: str, size: int = 5) -> list[dict]:
     params = {"query": query.strip(), "size": size}
     try:
         resp = requests.get(url, headers=headers, params=params, timeout=10)
-        if resp.status_code != 200:
-            return []
-        return resp.json().get("documents", [])
-    except Exception:
-        return []
+    except Exception as e:
+        raise ValueError(f"Kakao 요청 실패: {e}") from e
+    if resp.status_code == 401:
+        raise ValueError("Kakao API 키가 유효하지 않습니다 (401)")
+    if resp.status_code != 200:
+        raise ValueError(f"Kakao API 오류 (HTTP {resp.status_code})")
+    return resp.json().get("documents", [])
 
 
 def reverse_geocode_kakao(lat: float, lon: float, api_key: str) -> str:
