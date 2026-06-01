@@ -53,6 +53,16 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/outbound-ip")
+def outbound_ip():
+    """임시: Render 아웃바운드 IP 확인 (ODsay IP 등록용)."""
+    import httpx
+
+    ip = httpx.get("https://api.ipify.org", timeout=10).text.strip()
+    print(ip)
+    return {"ip": ip}
+
+
 @app.get("/search")
 def search_places(q: str):
     """키워드 장소 검색 (자동완성)"""
