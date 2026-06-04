@@ -13,7 +13,7 @@ load_dotenv()
 
 from geocode import geocode_kakao, search_keyword_kakao, reverse_geocode_kakao
 from simulate import run_simulation
-from weight import apply_weights
+from weight import apply_weights, build_pareto_candidates
 from pareto import extract_pareto
 
 app = FastAPI(title="Opti API", version="1.0.0")
@@ -170,11 +170,11 @@ def analyze(req: AnalyzeRequest):
         logger.exception("run_simulation failed")
         raise HTTPException(status_code=502, detail=f"경로 분석 실패: {str(e)}")
 
-    # 3. 가중치 적용
-    rows = apply_weights(sim_result["rows"])
+    # 3. 파레토 후보 집합 (환승 + transit_only + taxi_only) → 가중치 적용
+    candidates = apply_weights(build_pareto_candidates(sim_result))
 
     # 4. 파레토 프론티어 추출
-    pareto_rows = extract_pareto(rows)
+    pareto_rows = extract_pareto(candidates)
 
     # 5. 제약 필터 적용 (필터링 후 순위 재정렬)
     recommendations = []
@@ -211,6 +211,7 @@ def _build_recommendation(row: dict, rank: int) -> dict:
     transit_total = transit_vehicle + walk_min  # ODsay 구간 전체(도보 포함)
     return {
         "rank":             rank,
+        "mode":             row.get("mode", "hybrid"),
         "transfer_point":   row["transfer_point"],
         "total_minutes":    round(row["total_minutes"], 1),
         "weighted_minutes": round(row["weighted_minutes"], 2),

@@ -68,7 +68,15 @@ def run_simulation(origin_lat, origin_lon, dest_lat, dest_lon, depart_time, tmap
         raise ValueError("대중교통 경로를 가져올 수 없습니다.")
     best = paths[0]
     parsed = parse_transit_path(best)
-    transit_only = {"minutes": parsed["total_minutes"], "price": parsed["price"], "transfers": parsed["transfers"], "segments": _build_segments(best)}
+    transit_only = {
+        "minutes": parsed["total_minutes"],
+        "price": parsed["price"],
+        "transfers": parsed["transfers"],
+        "walk_minutes": parsed["walk_minutes"],
+        "transit_minutes": parsed["transit_minutes"],
+        "lines": parsed["lines"],
+        "segments": _build_segments(best),
+    }
     for sub in best.get("subPath", []):
         if sub.get("trafficType") not in [1, 2]:
             continue

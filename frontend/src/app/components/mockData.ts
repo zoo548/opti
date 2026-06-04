@@ -8,6 +8,7 @@ export interface Segment {
 
 export interface Recommendation {
   rank: number;
+  mode?: "hybrid" | "transit_only" | "taxi_only";
   transfer_point: string;
   total_minutes: number;
   weighted_minutes: number;
