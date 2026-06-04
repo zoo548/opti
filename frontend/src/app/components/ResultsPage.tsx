@@ -27,8 +27,9 @@ const BORDER = "rgba(255,255,255,0.24)";
 const TEXT = "#E8F0FF";
 const MUTED = "#FFFFFF";
 
-function recTransitPlusTaxi(rec: Recommendation): number {
-  return rec.transit_segment.minutes + rec.taxi_segment.minutes;
+/** 카드·baseline과 동일 — API의 total_minutes(총 소요시간) */
+function routeMinutes(rec: Recommendation): number {
+  return rec.total_minutes;
 }
 
 function collectTimeBounds(
@@ -38,7 +39,7 @@ function collectTimeBounds(
   const times = [
     baselines.transit_only.minutes,
     baselines.taxi_only.minutes,
-    ...recommendations.map(recTransitPlusTaxi),
+    ...recommendations.map(routeMinutes),
   ];
   return { min: Math.min(...times), max: Math.max(...times) };
 }
@@ -83,8 +84,7 @@ export function ResultsPage({ data, onBack, onSelectCard }: ResultsPageProps) {
   );
 
   const filtered = sorted.filter((rec) => {
-    const t = recTransitPlusTaxi(rec);
-    return t <= maxTime && rec.price <= maxPrice;
+    return routeMinutes(rec) <= maxTime && rec.price <= maxPrice;
   });
 
   return (
