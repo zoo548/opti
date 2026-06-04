@@ -27,64 +27,41 @@ const BORDER = "rgba(255,255,255,0.24)";
 const TEXT = "#E8F0FF";
 const MUTED = "#FFFFFF";
 
-/** 카드·baseline과 동일 — API의 total_minutes(총 소요시간) */
+/** 가중치 없음 — 카드·슬라이더·필터 모두 API total_minutes(실제 총 소요시간) */
 function routeMinutes(rec: Recommendation): number {
   return rec.total_minutes;
 }
 
-/** 슬라이더 thumb 범위 (0.1분 단위로 반올림) */
-function collectTimeExtent(
-  recommendations: Recommendation[],
-  baselines: ResultsPageProps["data"]["baselines"]
-): { min: number; max: number } {
-  const times = [
-    baselines.transit_only.minutes,
-    baselines.taxi_only.minutes,
-    ...recommendations.map(routeMinutes),
-  ];
-  return { min: roundMin(Math.min(...times)), max: roundMin(Math.max(...times)) };
+/** 시간 슬라이더 = 택시만(min) ~ 대중교통만(max) baseline과 동일 */
+function baselineTimeBounds(baselines: ResultsPageProps["data"]["baselines"]) {
+  return {
+    min: roundMin(baselines.taxi_only.minutes),
+    max: roundMin(baselines.transit_only.minutes),
+  };
 }
 
-function collectPriceExtent(
-  recommendations: Recommendation[],
-  baselines: ResultsPageProps["data"]["baselines"]
-): { min: number; max: number } {
-  const prices = [
-    baselines.transit_only.price,
-    baselines.taxi_only.price,
-    ...recommendations.map((r) => r.price),
-  ];
-  return { min: Math.min(...prices), max: Math.max(...prices) };
+/** 비용 슬라이더 = 대중교통만(min) ~ 택시만(max) baseline과 동일 */
+function baselinePriceBounds(baselines: ResultsPageProps["data"]["baselines"]) {
+  return {
+    min: baselines.transit_only.price,
+    max: baselines.taxi_only.price,
+  };
 }
 
 export function ResultsPage({ data, onBack, onSelectCard }: ResultsPageProps) {
   const [sortKey, setSortKey] = useState<SortKey>("weighted");
   const { baselines, recommendations } = data;
 
-  const timeExtent = useMemo(
-    () => collectTimeExtent(recommendations, baselines),
-    [recommendations, baselines]
-  );
-  const priceExtent = useMemo(
-    () => collectPriceExtent(recommendations, baselines),
-    [recommendations, baselines]
-  );
+  const timeBounds = useMemo(() => baselineTimeBounds(baselines), [baselines]);
+  const priceBounds = useMemo(() => baselinePriceBounds(baselines), [baselines]);
 
-  const timeBaseline = useMemo(
-    () => ({
-      taxi: roundMin(baselines.taxi_only.minutes),
-      transit: roundMin(baselines.transit_only.minutes),
-    }),
-    [baselines]
-  );
-
-  const [maxTime, setMaxTime] = useState(timeExtent.max);
-  const [maxPrice, setMaxPrice] = useState(priceExtent.max);
+  const [maxTime, setMaxTime] = useState(timeBounds.max);
+  const [maxPrice, setMaxPrice] = useState(priceBounds.max);
 
   useEffect(() => {
-    setMaxTime(timeExtent.max);
-    setMaxPrice(priceExtent.max);
-  }, [timeExtent.max, priceExtent.max]);
+    setMaxTime(timeBounds.max);
+    setMaxPrice(priceBounds.max);
+  }, [timeBounds.max, priceBounds.max]);
 
   const sorted = [...recommendations].sort((a, b) =>
     sortKey === "weighted"
@@ -120,19 +97,16 @@ export function ResultsPage({ data, onBack, onSelectCard }: ResultsPageProps) {
           <MaxOnlySlider
             label="소요 시간"
             icon={<Clock size={12} style={{ color: CYAN }} />}
-            bounds={timeExtent}
+            bounds={timeBounds}
             value={maxTime}
             onChange={(v) => setMaxTime(roundMin(v))}
             step={0.1}
             formatBound={fmtMin}
             formatBelow={(v) => `${fmtMin(v)} 이하`}
-            labelMin={fmtMin(timeBaseline.taxi)}
-            labelMax={fmtMin(timeBaseline.transit)}
-            markerValue={timeBaseline.transit}
           />
           <MaxOnlySlider
             label="비용"
-            bounds={priceExtent}
+            bounds={priceBounds}
             value={maxPrice}
             onChange={setMaxPrice}
             step={100}
@@ -184,9 +158,6 @@ function MaxOnlySlider({
   step,
   formatBound,
   formatBelow,
-  labelMin,
-  labelMax,
-  markerValue,
 }: {
   label: string;
   icon?: React.ReactNode;
@@ -196,19 +167,10 @@ function MaxOnlySlider({
   step: number;
   formatBound: (v: number) => string;
   formatBelow: (v: number) => string;
-  /** 하단 라벨 — 미지정 시 bounds min/max (비용 슬라이더) */
-  labelMin?: string;
-  labelMax?: string;
-  /** 기준선 눈금 (대중교통만 소요시간 등) */
-  markerValue?: number;
 }) {
   const disabled = bounds.min >= bounds.max;
   const span = bounds.max - bounds.min || 1;
   const fillPct = ((value - bounds.min) / span) * 100;
-  const markerPct =
-    markerValue != null && markerValue > bounds.min && markerValue < bounds.max
-      ? ((markerValue - bounds.min) / span) * 100
-      : null;
 
   return (
     <div>
@@ -227,13 +189,6 @@ function MaxOnlySlider({
           className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full"
           style={{ background: "rgba(255,255,255,0.12)" }}
         />
-        {markerPct != null && (
-          <div
-            className="absolute top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full pointer-events-none"
-            style={{ left: `${markerPct}%`, marginLeft: -1, background: "rgba(255,255,255,0.45)" }}
-            title={labelMax}
-          />
-        )}
         <div
           className="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full"
           style={{
@@ -255,8 +210,8 @@ function MaxOnlySlider({
       </div>
 
       <div className="flex justify-between mt-2 px-0.5">
-        <span style={{ fontSize: "0.7rem", color: MUTED, fontWeight: 600 }}>{labelMin ?? formatBound(bounds.min)}</span>
-        <span style={{ fontSize: "0.7rem", color: MUTED, fontWeight: 600 }}>{labelMax ?? formatBound(bounds.max)}</span>
+        <span style={{ fontSize: "0.7rem", color: MUTED, fontWeight: 600 }}>{formatBound(bounds.min)}</span>
+        <span style={{ fontSize: "0.7rem", color: MUTED, fontWeight: 600 }}>{formatBound(bounds.max)}</span>
       </div>
 
       <style>{`

@@ -178,9 +178,14 @@ def analyze(req: AnalyzeRequest):
     ranked_pareto = rank_by_normalized_distance(pareto_rows)
 
     # 5. 추천 카드 (hybrid만; baseline은 별도 카드)
+    transit_baseline = sim_result["transit_only"]
+    taxi_baseline    = sim_result["taxi_only"]
     recommendations = []
     for row in ranked_pareto:
         if row.get("mode") in ("taxi_only", "transit_only"):
+            continue
+        # 슬라이더·카드는 total_minutes(가중치 없음); 대중교통만보다 느린 환승은 제외
+        if row["total_minutes"] > transit_baseline["minutes"]:
             continue
         over_time  = allowed_minutes is not None and row["total_minutes"] > allowed_minutes
         over_price = req.constraints.max_price is not None and row["price"] > req.constraints.max_price
@@ -190,8 +195,6 @@ def analyze(req: AnalyzeRequest):
         recommendations.append(rec)
 
     # 6. 기준선 비교값 채우기
-    transit_baseline = sim_result["transit_only"]
-    taxi_baseline    = sim_result["taxi_only"]
     for rec in recommendations:
         rec["savings"] = {
             "vs_transit_minutes": transit_baseline["minutes"] - rec["total_minutes"],
