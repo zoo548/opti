@@ -78,9 +78,11 @@ export function ResultsPage({ data, onBack, onSelectCard }: ResultsPageProps) {
   }, [timeBounds.max, priceBounds.max]);
 
   const sorted = [...recommendations].sort((a, b) =>
-    sortKey === "weighted" ? a.weighted_minutes - b.weighted_minutes :
-    sortKey === "price" ? a.price - b.price :
-    a.total_minutes - b.total_minutes
+    sortKey === "weighted"
+      ? (a.norm_distance ?? Infinity) - (b.norm_distance ?? Infinity)
+      : sortKey === "price"
+        ? a.price - b.price
+        : a.total_minutes - b.total_minutes
   );
 
   const filtered = sorted.filter((rec) => {

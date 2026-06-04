@@ -12,6 +12,9 @@ export interface Recommendation {
   transfer_point: string;
   total_minutes: number;
   weighted_minutes: number;
+  norm_distance?: number;
+  t_norm?: number;
+  c_norm?: number;
   price: number;
   transit_segment: {
     minutes: number;

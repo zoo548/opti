@@ -14,7 +14,7 @@ load_dotenv()
 from geocode import geocode_kakao, search_keyword_kakao, reverse_geocode_kakao
 from simulate import run_simulation
 from weight import apply_weights, build_pareto_candidates
-from pareto import extract_pareto
+from pareto import extract_pareto, rank_by_normalized_distance
 
 app = FastAPI(title="Opti API", version="1.0.0")
 
@@ -173,12 +173,15 @@ def analyze(req: AnalyzeRequest):
     # 3. 파레토 후보 집합 (환승 + transit_only + taxi_only) → 가중치 적용
     candidates = apply_weights(build_pareto_candidates(sim_result))
 
-    # 4. 파레토 프론티어 추출
+    # 4. 파레토 프론티어 추출 → 정규화 원점 거리로 추천순(rank)
     pareto_rows = extract_pareto(candidates)
+    ranked_pareto = rank_by_normalized_distance(pareto_rows)
 
-    # 5. 제약 필터 적용 (필터링 후 순위 재정렬)
+    # 5. 추천 카드 (hybrid만; baseline은 별도 카드)
     recommendations = []
-    for row in sorted(pareto_rows, key=lambda r: r["weighted_minutes"]):
+    for row in ranked_pareto:
+        if row.get("mode") in ("taxi_only", "transit_only"):
+            continue
         over_time  = allowed_minutes is not None and row["total_minutes"] > allowed_minutes
         over_price = req.constraints.max_price is not None and row["price"] > req.constraints.max_price
         rec = _build_recommendation(row, len(recommendations) + 1)
@@ -227,4 +230,7 @@ def _build_recommendation(row: dict, rank: int) -> dict:
             "minutes": round(row["taxi_minutes"], 1),
             "price":   int(row.get("taxi_price", 0)),
         },
+        "norm_distance": row.get("norm_distance"),
+        "t_norm":          row.get("t_norm"),
+        "c_norm":          row.get("c_norm"),
     }
