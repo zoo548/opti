@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { Recommendation } from "./mockData";
 import { OptiHeader } from "./OptiHeader";
 import { SHADOW_ICON } from "../buttonStyles";
+import { fmtMin, roundMin } from "../formatMinutes";
 
 interface DetailPageProps {
   rec: Recommendation;
@@ -39,7 +40,7 @@ export function DetailPage({ rec, baselines, onBack }: DetailPageProps) {
           <span className="inline-flex px-2 py-0.5 rounded-full text-white font-bold" style={{ background: "#34C759", fontSize: "0.7rem" }}>{rec.rank}순위</span>
           <span style={{ fontSize: "0.9375rem", fontWeight: 700, color: TEXT }}>{rec.transfer_point} 환승</span>
         </div>
-        <p style={{ fontSize: "0.75rem", color: MUTED, marginBottom: "12px" }}>총 {rec.total_minutes}분 · {rec.price.toLocaleString()}원</p>
+        <p style={{ fontSize: "0.75rem", color: MUTED, marginBottom: "12px" }}>총 {fmtMin(rec.total_minutes)} · {rec.price.toLocaleString()}원</p>
 
         <div className="rounded-2xl p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <div className="flex rounded-full overflow-hidden mb-3" style={{ height: "10px" }}>
@@ -49,11 +50,11 @@ export function DetailPage({ rec, baselines, onBack }: DetailPageProps) {
           <div className="flex justify-between">
             <span className="flex items-center gap-1.5" style={{ fontSize: "0.75rem", color: MUTED }}>
               <span className="w-2 h-2 rounded-full" style={{ background: CYAN }} />
-              대중교통 {rec.transit_segment.minutes}분 · {rec.transit_segment.price.toLocaleString()}원
+              대중교통 {fmtMin(rec.transit_segment.minutes)} · {rec.transit_segment.price.toLocaleString()}원
             </span>
             <span className="flex items-center gap-1.5" style={{ fontSize: "0.75rem", color: MUTED }}>
               <span className="w-2 h-2 rounded-full" style={{ background: AMBER }} />
-              택시 {rec.taxi_segment.minutes}분 · {rec.taxi_segment.price.toLocaleString()}원
+              택시 {fmtMin(rec.taxi_segment.minutes)} · {rec.taxi_segment.price.toLocaleString()}원
             </span>
           </div>
         </div>
@@ -64,17 +65,17 @@ export function DetailPage({ rec, baselines, onBack }: DetailPageProps) {
           <p style={{ fontSize: "0.875rem", fontWeight: 700, color: TEXT }} className="mb-4">전체 경로</p>
           <TLNode dot={CYAN} label="출발지" lineColor={CYAN} />
           {(rec.transit_segment.walk_minutes ?? 0) > 0 && (
-            <TLLine label={`🚶 도보 ${rec.transit_segment.walk_minutes}분`} color={MUTED} />
+            <TLLine label={`🚶 도보 ${fmtMin(rec.transit_segment.walk_minutes ?? 0)}`} color={MUTED} />
           )}
           {rec.transit_segment.lines.map((line, i) => (
             <div key={i}>
               <TLNode dot={CYAN} label={`🚇 ${line.name} (${line.from})`} sub={`${line.to} 방면`} lineColor={CYAN} />
-              <TLLine label={`${line.minutes}분`} color={CYAN} />
+              <TLLine label={fmtMin(line.minutes)} color={CYAN} />
             </div>
           ))}
           <TLNode dot={AMBER} diamond label={`📍 ${rec.transfer_point} — 환승`} lineColor={AMBER} highlight />
-          <TLLine label={`🚕 택시 ${rec.taxi_segment.minutes}분 · ${rec.taxi_segment.price.toLocaleString()}원`} color={AMBER} />
-          <TLNode dot="#34C759" label="🏁 도착지" sub={`총 ${rec.total_minutes}분 · ${rec.price.toLocaleString()}원`} lineColor="transparent" last />
+          <TLLine label={`🚕 택시 ${fmtMin(rec.taxi_segment.minutes)} · ${rec.taxi_segment.price.toLocaleString()}원`} color={AMBER} />
+          <TLNode dot="#34C759" label="🏁 도착지" sub={`총 ${fmtMin(rec.total_minutes)} · ${rec.price.toLocaleString()}원`} lineColor="transparent" last />
         </div>
 
         <div className="rounded-2xl p-4" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
@@ -92,14 +93,14 @@ export function DetailPage({ rec, baselines, onBack }: DetailPageProps) {
           <p style={{ fontSize: "0.875rem", fontWeight: 700, color: TEXT }} className="mb-3">기준선 비교</p>
           <div className="flex flex-col gap-2.5">
             <CompareRow icon="🚇" label="대중교통만"
-              sub={`${baselines.transit_only.minutes}분 / ${baselines.transit_only.price.toLocaleString()}원`}
-              badge={`-${rec.savings.vs_transit_minutes}분`} badgeColor={CYAN}
+              sub={`${fmtMin(baselines.transit_only.minutes)} / ${baselines.transit_only.price.toLocaleString()}원`}
+              badge={`-${fmtMin(rec.savings.vs_transit_minutes)}`} badgeColor={CYAN}
               note={`+${(rec.price - baselines.transit_only.price).toLocaleString()}원`}
               glow="rgba(76,200,240,0.08)" border="rgba(76,200,240,0.12)" />
             <CompareRow icon="🚕" label="택시만"
-              sub={`${baselines.taxi_only.minutes}분 / ${baselines.taxi_only.price.toLocaleString()}원`}
+              sub={`${fmtMin(baselines.taxi_only.minutes)} / ${baselines.taxi_only.price.toLocaleString()}원`}
               badge={`-${rec.savings.vs_taxi_price.toLocaleString()}원`} badgeColor={AMBER}
-              note={`+${rec.total_minutes - baselines.taxi_only.minutes}분`}
+              note={`+${fmtMin(rec.total_minutes - baselines.taxi_only.minutes)}`}
               glow="rgba(245,166,35,0.08)" border="rgba(245,166,35,0.12)" />
           </div>
         </div>
@@ -110,7 +111,7 @@ export function DetailPage({ rec, baselines, onBack }: DetailPageProps) {
             <p style={{ fontSize: "0.75rem", color: MUTED, marginTop: "2px" }}>α=1.99 (시간) · β=11.24 (환승)</p>
           </div>
           <p style={{ fontSize: "2.25rem", fontWeight: 900, color: CYAN, textShadow: `0 0 24px ${CYAN}70`, lineHeight: 1 }}>
-            {rec.weighted_minutes.toFixed(1)}
+            {roundMin(rec.weighted_minutes)}
           </p>
         </div>
       </main>

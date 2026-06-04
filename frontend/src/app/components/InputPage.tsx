@@ -1,16 +1,12 @@
 import { useState, useEffect } from "react";
 import { Search, Navigation, X, ArrowRight, Loader2 } from "lucide-react";
 import { OptiHeader } from "./OptiHeader";
-import { TimePicker, formatTime12Label } from "./TimePicker";
 import { SearchParams } from "../App";
 import { BACKEND } from "../../config";
 import {
   primaryButtonStyle,
   SHADOW_ICON,
   SHADOW_ICON_ACCENT,
-  sortTabStyle,
-  toggleKnobStyle,
-  toggleTrackStyle,
 } from "../buttonStyles";
 
 interface InputPageProps {
@@ -64,6 +60,7 @@ function useKakaoSearch(query: string, onError: (msg: string | null) => void) {
 
   return results;
 }
+
 const CYAN = "#4CC8F0";
 const CARD = "#252A42";
 const BG = "#1C2035";
@@ -71,58 +68,13 @@ const BORDER = "rgba(255,255,255,0.24)";
 const BORDER_SUBTLE = "rgba(255,255,255,0.14)";
 const TEXT = "#E8F0FF";
 const MUTED = "#FFFFFF";
-const DEEP = "#2A3050";
 const pad2 = (n: number) => String(n).padStart(2, "0");
-
-function defaultArriveTime(): string {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() + 60);
-  const m = Math.round(d.getMinutes() / 5) * 5;
-  return `${pad2(d.getHours())}:${pad2(m % 60)}`;
-}
-
-/** HH:mm → 오늘 또는 내일 해당 시각의 Date */
-function buildArriveDate(timeHHmm: string): Date {
-  const [h, m] = timeHHmm.split(":").map(Number);
-  const now = new Date();
-  const arrive = new Date(now);
-  arrive.setHours(h, m, 0, 0);
-  if (arrive.getTime() <= now.getTime()) {
-    arrive.setDate(arrive.getDate() + 1);
-  }
-  return arrive;
-}
-
-function minutesUntilArrival(timeHHmm: string): number {
-  return Math.round((buildArriveDate(timeHHmm).getTime() - Date.now()) / 60000);
-}
-
-function formatArriveLabel(timeHHmm: string): string {
-  const arrive = buildArriveDate(timeHHmm);
-  const now = new Date();
-  const mins = minutesUntilArrival(timeHHmm);
-  const isTomorrow = arrive.getDate() !== now.getDate() || arrive.getMonth() !== now.getMonth();
-  const prefix = isTomorrow ? "내일 " : "";
-  return `${prefix}${formatTime12Label(timeHHmm)} 도착 · 약 ${mins}분`;
-}
-
-type TimeConstraintMode = "clock" | "duration";
-
-function formatDurationLabel(minutes: number) {
-  return `지금부터 ${minutes}분 이내 도착`;
-}
 
 export function InputPage({ onSearch }: InputPageProps) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
-  const [maxPrice, setMaxPrice] = useState(20000);
-  const [useTime, setUseTime] = useState(true);
-  const [usePrice, setUsePrice] = useState(false);
   const [showOriginSug, setShowOriginSug] = useState(false);
   const [showDestSug, setShowDestSug] = useState(false);
-  const [timeMode, setTimeMode] = useState<TimeConstraintMode>("duration");
-  const [arriveTime, setArriveTime] = useState(defaultArriveTime);
-  const [allowedMinutes, setAllowedMinutes] = useState(60);
   const [loading, setLoading] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -131,7 +83,7 @@ export function InputPage({ onSearch }: InputPageProps) {
   const originResults = useKakaoSearch(origin, setSearchError);
   const destResults = useKakaoSearch(destination, setSearchError);
 
-  const canSearch = origin.length > 0 && destination.length > 0 && (useTime || usePrice);
+  const canSearch = origin.length > 0 && destination.length > 0;
 
   const handleCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -192,33 +144,15 @@ export function InputPage({ onSearch }: InputPageProps) {
       const destData = await destRes.json();
 
       const now = new Date();
-      let arriveDate: Date | null = null;
-      if (useTime) {
-        if (timeMode === "duration") {
-          if (allowedMinutes < 10) {
-            throw new Error("허용 시간은 최소 10분 이상이어야 합니다.");
-          }
-          arriveDate = new Date(now.getTime() + allowedMinutes * 60000);
-        } else {
-          const mins = minutesUntilArrival(arriveTime);
-          if (mins < 10) {
-            throw new Error("도착 시각은 현재 시각보다 10분 이후여야 합니다.");
-          }
-          arriveDate = buildArriveDate(arriveTime);
-        }
-      }
-
       const fmt = (d: Date) =>
         `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00+0900`;
-      const departTime = fmt(now);
-      const arriveByISO = arriveDate ? fmt(arriveDate) : null;
 
       onSearch({
         origin: { address: originData.address, lat: originData.lat, lon: originData.lon },
         destination: { address: destData.address, lat: destData.lat, lon: destData.lon },
-        arriveBy: arriveByISO,
-        maxPrice: usePrice ? maxPrice : null,
-        departTime,
+        arriveBy: null,
+        maxPrice: null,
+        departTime: fmt(now),
       });
     } catch (e: any) {
       setGeoError(e.message);
@@ -330,95 +264,6 @@ export function InputPage({ onSearch }: InputPageProps) {
                     </div>
                   </button>
                 ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-2xl overflow-hidden" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-          <div style={{ borderBottom: `1px solid ${BORDER}` }}>
-            <button className="w-full flex items-center gap-3 px-4 py-4 transition-all" onClick={() => setUseTime((v) => !v)}>
-              <div className="w-11 h-6 rounded-full flex-shrink-0 flex items-center px-0.5 transition-all" style={toggleTrackStyle(useTime)}>
-                <div className="w-5 h-5 rounded-full transition-all" style={{ ...toggleKnobStyle(), background: useTime ? "#0B0D1F" : "linear-gradient(180deg, #5A6478 0%, #2A3450 100%)", transform: useTime ? "translateX(20px)" : "translateX(0)" }} />
-              </div>
-              <div className="flex-1 text-left">
-                <p style={{ fontSize: "0.9rem", fontWeight: 600, color: useTime ? TEXT : MUTED }}>도착 희망 시각</p>
-                {useTime && (
-                  <p style={{ fontSize: "0.75rem", color: CYAN, marginTop: "1px" }}>
-                    {timeMode === "duration"
-                      ? formatDurationLabel(allowedMinutes)
-                      : formatArriveLabel(arriveTime)}
-                  </p>
-                )}
-              </div>
-            </button>
-            {useTime && (
-              <div className="px-4 pb-4">
-                <div className="flex gap-1 p-1 mb-3 rounded-2xl" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${BORDER}` }}>
-                  {([
-                    ["duration", "소요 시간"],
-                    ["clock", "시각 선택"],
-                  ] as const).map(([mode, label]) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setTimeMode(mode)}
-                      className="flex-1 py-2 rounded-xl transition-all active:scale-[0.98]"
-                      style={{
-                        ...sortTabStyle(timeMode === mode),
-                        background: timeMode === mode ? undefined : "transparent",
-                        color: timeMode === mode ? "#0B0D1F" : MUTED,
-                        fontSize: "0.8125rem",
-                        fontWeight: timeMode === mode ? 700 : 500,
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {timeMode === "clock" ? (
-                  <TimePicker value={arriveTime} onChange={setArriveTime} />
-                ) : (
-                  <>
-                    <p style={{ fontSize: "0.75rem", color: MUTED, marginBottom: "8px", fontWeight: 600 }}>
-                      지금부터 <span style={{ color: CYAN, fontWeight: 800 }}>{allowedMinutes}분</span> 이내 도착
-                    </p>
-                    <input
-                      type="range"
-                      min={10}
-                      max={120}
-                      step={5}
-                      value={allowedMinutes}
-                      onChange={(e) => setAllowedMinutes(Number(e.target.value))}
-                      className="w-full accent-primary"
-                    />
-                    <div className="flex justify-between mt-1">
-                      <span style={{ fontSize: "0.75rem", color: MUTED }}>10분</span>
-                      <span style={{ fontSize: "0.75rem", color: MUTED }}>120분</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-          <div>
-            <button className="w-full flex items-center gap-3 px-4 py-4 transition-all" onClick={() => setUsePrice((v) => !v)}>
-              <div className="w-11 h-6 rounded-full flex-shrink-0 flex items-center px-0.5 transition-all" style={toggleTrackStyle(usePrice)}>
-                <div className="w-5 h-5 rounded-full transition-all" style={{ ...toggleKnobStyle(), background: usePrice ? "#0B0D1F" : "linear-gradient(180deg, #5A6478 0%, #2A3450 100%)", transform: usePrice ? "translateX(20px)" : "translateX(0)" }} />
-              </div>
-              <div className="flex-1 text-left">
-                <p style={{ fontSize: "0.9rem", fontWeight: 600, color: usePrice ? TEXT : MUTED }}>최대 금액</p>
-                {usePrice && <p style={{ fontSize: "0.75rem", color: CYAN, marginTop: "1px" }}>{maxPrice.toLocaleString()}원</p>}
-              </div>
-            </button>
-            {usePrice && (
-              <div className="px-4 pb-4">
-                <input type="range" min={5000} max={50000} step={1000} value={maxPrice}
-                  onChange={(e) => setMaxPrice(Number(e.target.value))} className="w-full accent-primary" />
-                <div className="flex justify-between mt-1">
-                  <span style={{ fontSize: "0.75rem", color: MUTED }}>5,000원</span>
-                  <span style={{ fontSize: "0.75rem", color: MUTED }}>50,000원</span>
-                </div>
               </div>
             )}
           </div>
