@@ -2,26 +2,26 @@
 
 :root {
   --font-size: 16px;
-  --background: #1C2035;
-  --foreground: #E8F0FF;
-  --card: #252A42;
-  --card-foreground: #E8F0FF;
-  --popover: #1E2236;
-  --popover-foreground: #E8F0FF;
-  --primary: #4CC8F0;
-  --primary-foreground: #161929;
-  --secondary: #222640;
-  --secondary-foreground: #E8F0FF;
-  --muted: #222640;
-  --muted-foreground: #FFFFFF;
-  --accent: #243050;
-  --accent-foreground: #4CC8F0;
-  --destructive: #FF3B30;
-  --destructive-foreground: #FFFFFF;
-  --border: rgba(255,255,255,0.24);
+  --background: #f5f5f5;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+  --primary: #1A74E4;
+  --primary-foreground: #ffffff;
+  --secondary: #f0f0f0;
+  --secondary-foreground: #1a1a1a;
+  --muted: #f7f7f7;
+  --muted-foreground: #888888;
+  --accent: #EEF4FF;
+  --accent-foreground: #1A74E4;
+  --destructive: #E53935;
+  --destructive-foreground: #ffffff;
+  --border: #ebebeb;
   --input: transparent;
-  --input-background: #222640;
-  --switch-background: #2E3558;
+  --input-background: #f7f7f7;
+  --switch-background: #cbced4;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   --ring: #4CC8F0;
@@ -126,6 +126,27 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  .opti-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid #1A74E4;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+  }
+
+  .opti-range::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid #1A74E4;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
   }
 }
 

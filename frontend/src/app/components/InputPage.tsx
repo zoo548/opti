@@ -1,13 +1,8 @@
 import { useState, useEffect } from "react";
-import { Search, Navigation, X, ArrowRight, Loader2 } from "lucide-react";
-import { OptiHeader } from "./OptiHeader";
+import { Search, Loader2 } from "lucide-react";
 import { SearchParams } from "../App";
 import { BACKEND } from "../../config";
-import {
-  primaryButtonStyle,
-  SHADOW_ICON,
-  SHADOW_ICON_ACCENT,
-} from "../buttonStyles";
+import { OPTI } from "../optiTheme";
 
 interface InputPageProps {
   onSearch: (params: SearchParams) => void;
@@ -61,20 +56,56 @@ function useKakaoSearch(query: string, onError: (msg: string | null) => void) {
   return results;
 }
 
-const CYAN = "#4CC8F0";
-const CARD = "#252A42";
-const BG = "#1C2035";
-const BORDER = "rgba(255,255,255,0.24)";
-const BORDER_SUBTLE = "rgba(255,255,255,0.14)";
-const TEXT = "#E8F0FF";
-const MUTED = "#FFFFFF";
 const pad2 = (n: number) => String(n).padStart(2, "0");
+
+function ClearButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-label="지우기">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="8" fill="#ddd" />
+        <path d="M5 5l6 6M11 5l-6 6" stroke="#888" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
+function SuggestionList({
+  items,
+  onSelect,
+}: {
+  items: KakaoPlace[];
+  onSelect: (place: KakaoPlace) => void;
+}) {
+  return (
+    <div
+      className="absolute left-0 right-0 top-full z-30 mt-1 rounded-xl overflow-hidden"
+      style={{ background: OPTI.surface, boxShadow: OPTI.cardShadow, border: `1px solid ${OPTI.border}` }}
+    >
+      {items.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-[#fafafa]"
+          style={{ borderBottom: `1px solid ${OPTI.border}` }}
+          onMouseDown={() => onSelect(p)}
+        >
+          <Search size={12} style={{ color: OPTI.textMuted, marginTop: 4, flexShrink: 0 }} />
+          <div className="flex flex-col min-w-0">
+            <span className="truncate text-[14px] font-semibold" style={{ color: OPTI.text }}>{p.place_name}</span>
+            <span className="truncate text-[12px]" style={{ color: OPTI.textMuted }}>{p.address_name}</span>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function InputPage({ onSearch }: InputPageProps) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [showOriginSug, setShowOriginSug] = useState(false);
   const [showDestSug, setShowDestSug] = useState(false);
+  const [focusField, setFocusField] = useState<"from" | "to" | null>(null);
   const [loading, setLoading] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -84,6 +115,11 @@ export function InputPage({ onSearch }: InputPageProps) {
   const destResults = useKakaoSearch(destination, setSearchError);
 
   const canSearch = origin.length > 0 && destination.length > 0;
+
+  const handleSwap = () => {
+    setOrigin(destination);
+    setDestination(origin);
+  };
 
   const handleCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -106,8 +142,8 @@ export function InputPage({ onSearch }: InputPageProps) {
           } else {
             setGeoError("현재 위치의 주소를 찾을 수 없습니다.");
           }
-        } catch (e: any) {
-          setGeoError(`주소 변환 실패: ${e.message}`);
+        } catch (e: unknown) {
+          setGeoError(`주소 변환 실패: ${e instanceof Error ? e.message : "알 수 없음"}`);
         } finally {
           setGpsLoading(false);
         }
@@ -154,133 +190,159 @@ export function InputPage({ onSearch }: InputPageProps) {
         maxPrice: null,
         departTime: fmt(now),
       });
-    } catch (e: any) {
-      setGeoError(e.message);
+    } catch (e: unknown) {
+      setGeoError(e instanceof Error ? e.message : "검색 실패");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col" style={{ background: BG }}>
-      <OptiHeader />
-      <main className="flex-1 px-5 pb-8 flex flex-col gap-3">
-        <div className="mb-5 pl-3 relative top-5">
-          <p style={{ fontSize: "0.8125rem", color: "#7A8BAA", lineHeight: 1.25 }}>Pareto Optimal Hybrid Route</p>
-          <h1 style={{ fontSize: "1rem", fontWeight: 600, lineHeight: 1.25, color: "#9AADCC", letterSpacing: "-0.03em", marginTop: "5px" }}>
-            대중교통-택시 최적 환승 경로
-          </h1>
-          {(geoError || searchError) && (
-            <p style={{ fontSize: "0.75rem", color: "#FF3B30", marginTop: "4px" }}>{geoError ?? searchError}</p>
-          )}
-        </div>
+  const inputStyle = (field: "from" | "to") => ({
+    height: 44,
+    background: focusField === field ? OPTI.surface : OPTI.inputBg,
+    border: focusField === field ? `1.5px solid ${OPTI.primary}` : "1.5px solid transparent",
+  });
 
-        <div className="rounded-2xl overflow-visible" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="relative px-4 py-4 flex items-center gap-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
-            <div className="flex flex-col items-center gap-1 flex-shrink-0">
-              <div className="w-2.5 h-2.5 rounded-full border-2" style={{ borderColor: CYAN }} />
-              <div className="w-px h-4" style={{ background: "rgba(255,255,255,0.1)" }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p style={{ fontSize: "0.625rem", color: MUTED, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>출발</p>
-              <input className="w-full outline-none bg-transparent truncate placeholder:text-white/60"
-                style={{ fontSize: "0.9375rem", color: TEXT }}
-                placeholder="출발지를 입력하세요" value={origin}
-                onChange={(e) => { setOrigin(e.target.value); setShowOriginSug(e.target.value.length > 0); }}
-                onFocus={() => setShowOriginSug(origin.length > 0)}
-                onBlur={() => setTimeout(() => setShowOriginSug(false), 150)} />
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {origin && (
-                <button onClick={() => setOrigin("")} className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(180deg, #4A5268 0%, #353D52 100%)", boxShadow: SHADOW_ICON, border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <X size={10} style={{ color: MUTED }} />
-                </button>
-              )}
-              <button
-                onClick={handleCurrentLocation}
-                disabled={gpsLoading}
-                className="flex flex-col items-center flex-shrink-0"
-                style={{ gap: "8px" }}
-                aria-label="내 위치"
-              >
-                <span
-                  className="w-7 h-7 rounded-full flex items-center justify-center"
-                  style={{ background: "linear-gradient(180deg, rgba(76,200,240,0.28) 0%, rgba(76,200,240,0.12) 100%)", boxShadow: SHADOW_ICON_ACCENT, border: "1px solid rgba(76,200,240,0.25)" }}
+  return (
+    <div className="min-h-screen flex flex-col justify-center" style={{ background: OPTI.surface }}>
+      <div className="px-4 mb-8 text-center">
+        <h1 className="text-[36px] font-black tracking-tight" style={{ color: OPTI.primary }}>OPTI</h1>
+        <p className="text-[13px] mt-1" style={{ color: OPTI.textHint }}>대중교통 · 택시 환승경로 탐색 서비스</p>
+        {(geoError || searchError) && (
+          <p className="text-[12px] mt-2" style={{ color: OPTI.error }}>{geoError ?? searchError}</p>
+        )}
+      </div>
+
+      <div className="px-4 pb-4">
+        <div className="flex flex-col gap-1.5">
+          {/* 출발 */}
+          <div className="relative">
+            <div className="flex items-center gap-2 px-3 rounded-xl" style={inputStyle("from")}>
+              <div className="w-2 h-2 rounded-full border-2 flex-shrink-0" style={{ borderColor: OPTI.primary }} />
+              <input
+                value={origin}
+                onChange={(e) => {
+                  setOrigin(e.target.value);
+                  setShowOriginSug(e.target.value.length > 0);
+                }}
+                onFocus={() => {
+                  setFocusField("from");
+                  setShowOriginSug(origin.length > 0);
+                }}
+                onBlur={() => {
+                  setFocusField(null);
+                  setTimeout(() => setShowOriginSug(false), 150);
+                }}
+                placeholder="출발지를 입력하세요"
+                className="flex-1 bg-transparent outline-none text-[14px] placeholder-[#aaa] min-w-0"
+                style={{ color: OPTI.text }}
+              />
+              {origin ? (
+                <ClearButton onClick={() => setOrigin("")} />
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCurrentLocation}
+                  disabled={gpsLoading}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full flex-shrink-0"
+                  style={{ background: OPTI.primaryLight }}
                 >
                   {gpsLoading ? (
-                    <Loader2 size={13} className="animate-spin" style={{ color: CYAN }} />
+                    <Loader2 size={12} className="animate-spin" style={{ color: OPTI.primary }} />
                   ) : (
-                    <Navigation size={13} style={{ color: CYAN }} />
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <circle cx="6" cy="6" r="2" fill={OPTI.primary} />
+                      <circle cx="6" cy="6" r="4.5" stroke={OPTI.primary} strokeWidth="1.2" />
+                      <path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11" stroke={OPTI.primary} strokeWidth="1.2" strokeLinecap="round" />
+                    </svg>
                   )}
-                </span>
-                <span style={{ fontSize: "0.5625rem", color: MUTED, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
-                  내 위치
-                </span>
-              </button>
+                  <span className="text-[11px] font-medium" style={{ color: OPTI.primary }}>내 위치</span>
+                </button>
+              )}
             </div>
             {showOriginSug && originResults.length > 0 && (
-              <div className="absolute left-0 right-0 top-full z-30 rounded-b-2xl shadow-2xl overflow-hidden" style={{ background: CARD, border: `1px solid ${BORDER}`, borderTop: "none" }}>
-                {originResults.map((p) => (
-                  <button key={p.id} className="w-full text-left px-4 py-3 flex items-start gap-3" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
-                    onMouseDown={() => { setOrigin(p.place_name || p.address_name); setShowOriginSug(false); }}>
-                    <Search size={12} style={{ color: MUTED, marginTop: "4px", flexShrink: 0 }} />
-                    <div className="flex flex-col min-w-0">
-                      <span className="truncate" style={{ fontSize: "0.875rem", fontWeight: 700, color: TEXT }}>{p.place_name}</span>
-                      <span className="truncate" style={{ fontSize: "0.75rem", color: MUTED }}>{p.address_name}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              <SuggestionList
+                items={originResults}
+                onSelect={(p) => {
+                  setOrigin(p.place_name || p.address_name);
+                  setShowOriginSug(false);
+                }}
+              />
             )}
           </div>
 
-          <div className="relative px-4 py-4 flex items-center gap-3">
-            <div className="flex-shrink-0">
-              <div className="w-2.5 h-2.5 rounded-sm" style={{ background: CYAN }} />
+          {/* dots + swap */}
+          <div className="flex items-center justify-between px-3">
+            <div className="flex flex-col items-center gap-0.5 ml-[1px]">
+              <div className="w-0.5 h-0.5 rounded-full bg-[#ccc]" />
+              <div className="w-0.5 h-0.5 rounded-full bg-[#ccc]" />
+              <div className="w-0.5 h-0.5 rounded-full bg-[#ccc]" />
             </div>
-            <div className="flex-1 min-w-0">
-              <p style={{ fontSize: "0.625rem", color: MUTED, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>도착</p>
-              <input className="w-full outline-none bg-transparent truncate placeholder:text-white/60"
-                style={{ fontSize: "0.9375rem", color: TEXT }}
-                placeholder="도착지를 입력하세요" value={destination}
-                onChange={(e) => { setDestination(e.target.value); setShowDestSug(e.target.value.length > 0); }}
-                onFocus={() => setShowDestSug(destination.length > 0)}
-                onBlur={() => setTimeout(() => setShowDestSug(false), 150)} />
-            </div>
-            {destination && (
-              <button onClick={() => setDestination("")} className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(180deg, #4A5268 0%, #353D52 100%)", boxShadow: SHADOW_ICON, border: "1px solid rgba(255,255,255,0.08)" }}>
-                <X size={10} style={{ color: MUTED }} />
-              </button>
-            )}
-            {showDestSug && destResults.length > 0 && (
-              <div className="absolute left-0 right-0 top-full z-30 rounded-b-2xl shadow-2xl overflow-hidden" style={{ background: CARD, border: `1px solid ${BORDER}`, borderTop: "none" }}>
-                {destResults.map((p) => (
-                  <button key={p.id} className="w-full text-left px-4 py-3 flex items-start gap-3" style={{ borderBottom: `1px solid ${BORDER_SUBTLE}` }}
-                    onMouseDown={() => { setDestination(p.place_name || p.address_name); setShowDestSug(false); }}>
-                    <Search size={12} style={{ color: MUTED, marginTop: "4px", flexShrink: 0 }} />
-                    <div className="flex flex-col min-w-0">
-                      <span className="truncate" style={{ fontSize: "0.875rem", fontWeight: 700, color: TEXT }}>{p.place_name}</span>
-                      <span className="truncate" style={{ fontSize: "0.75rem", color: MUTED }}>{p.address_name}</span>
-                    </div>
-                  </button>
-                ))}
+            <button
+              type="button"
+              onClick={handleSwap}
+              className="flex items-center justify-center rounded-lg"
+              style={{ width: 28, height: 28, background: OPTI.inputBg }}
+              aria-label="출발·도착 바꾸기"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M4 2v10M4 12l-2-2.5M4 12l2-2.5" stroke="#555" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M10 12V2M10 2l-2 2.5M10 2l2 2.5" stroke="#555" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+
+          {/* 도착 + 길찾기 */}
+          <div className="flex items-stretch gap-2">
+            <div className="relative flex-1 min-w-0">
+              <div className="flex items-center gap-2 px-3 rounded-xl" style={inputStyle("to")}>
+                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: OPTI.primary }} />
+                <input
+                  value={destination}
+                  onChange={(e) => {
+                    setDestination(e.target.value);
+                    setShowDestSug(e.target.value.length > 0);
+                  }}
+                  onFocus={() => {
+                    setFocusField("to");
+                    setShowDestSug(destination.length > 0);
+                  }}
+                  onBlur={() => {
+                    setFocusField(null);
+                    setTimeout(() => setShowDestSug(false), 150);
+                  }}
+                  placeholder="도착지를 입력하세요"
+                  className="flex-1 bg-transparent outline-none text-[14px] placeholder-[#aaa] min-w-0"
+                  style={{ color: OPTI.text }}
+                />
+                {destination && <ClearButton onClick={() => setDestination("")} />}
               </div>
-            )}
+              {showDestSug && destResults.length > 0 && (
+                <SuggestionList
+                  items={destResults}
+                  onSelect={(p) => {
+                    setDestination(p.place_name || p.address_name);
+                    setShowDestSug(false);
+                  }}
+                />
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={!canSearch || loading}
+              className="flex items-center justify-center rounded-xl text-white text-[11px] font-bold flex-shrink-0 disabled:opacity-70"
+              style={{
+                width: 44,
+                height: 44,
+                background: canSearch && !loading ? OPTI.primary : OPTI.primaryDisabled,
+              }}
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : "길찾기"}
+            </button>
           </div>
         </div>
-
-        <button disabled={!canSearch || loading} onClick={handleSearch}
-          className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:translate-y-[2px] active:shadow-none disabled:active:translate-y-0"
-          style={{
-            ...primaryButtonStyle(canSearch && !loading),
-            color: canSearch && !loading ? "#0B0D1F" : "rgba(255,255,255,0.45)",
-            fontSize: "0.9375rem",
-            fontWeight: 700,
-          }}>
-          <span>{loading ? "주소 확인 중..." : "최적 경로 찾기"}</span>
-          {canSearch && !loading && <ArrowRight size={16} />}
-        </button>
-      </main>
+      </div>
     </div>
   );
 }

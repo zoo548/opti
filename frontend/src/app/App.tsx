@@ -65,7 +65,7 @@ export default function App() {
       <div className="max-w-md mx-auto min-h-full">
         {error && (
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-semibold"
-            style={{ background: "rgba(255,59,48,0.15)", border: "1px solid rgba(255,59,48,0.3)", color: "#FF3B30" }}>
+            style={{ background: "#FFEBEE", border: "1px solid #FFCDD2", color: "#E53935" }}>
             {error}
           </div>
         )}
@@ -82,15 +82,19 @@ export default function App() {
             }
           />
         )}
-        {page === "results" && analysisResult && (
+        {page === "results" && analysisResult && searchParams && (
           <ResultsPage
+            from={searchParams.origin.address}
+            to={searchParams.destination.address}
             data={analysisResult}
             onBack={() => setPage("input")}
             onSelectCard={handleSelectCard}
           />
         )}
-        {page === "detail" && selectedRec && (
+        {page === "detail" && selectedRec && searchParams && (
           <DetailPage
+            from={searchParams.origin.address}
+            to={searchParams.destination.address}
             rec={selectedRec}
             baselines={analysisResult?.baselines}
             onBack={() => setPage("results")}

@@ -12,6 +12,8 @@ export interface Recommendation {
   transfer_point: string;
   total_minutes: number;
   weighted_minutes: number;
+  knee_score?: number;
+  is_knee?: boolean;
   norm_distance?: number;
   t_norm?: number;
   c_norm?: number;
