@@ -14,7 +14,7 @@ load_dotenv()
 from geocode import geocode_kakao, search_keyword_kakao, reverse_geocode_kakao
 from simulate import run_simulation
 from weight import apply_weights, build_pareto_candidates
-from pareto import extract_pareto, score_pareto_knee, assign_hybrid_knee, is_hybrid_row
+from pareto import extract_pareto, score_pareto_knee, assign_full_knee, is_hybrid_row
 
 app = FastAPI(title="Opti API", version="1.0.0")
 
@@ -177,16 +177,16 @@ def analyze(req: AnalyzeRequest):
     pareto_rows = extract_pareto(candidates)
     scored_pareto = score_pareto_knee(pareto_rows)
 
-    # 5. 추천 카드: hybrid만, knee_score 오름차순, ★는 hybrid 중 최솟값
+    # 5. 추천: 파이썬 find_knee_point과 동일 — 파레토 전체(baseline 포함)에서 무릎점 선택
     transit_baseline = sim_result["transit_only"]
     taxi_baseline    = sim_result["taxi_only"]
 
-    hybrid_rows = [
-        r for r in scored_pareto
-        if is_hybrid_row(r) and r["total_minutes"] <= transit_baseline["minutes"]
-    ]
+    assign_full_knee(scored_pareto)
+
+    # 카드 목록: hybrid 파레토 점 전체, knee_score 오름차순
+    # (사전 total_minutes 필터 없음 → 파이썬 프론티어/무릎점과 동일 결과)
+    hybrid_rows = [r for r in scored_pareto if is_hybrid_row(r)]
     hybrid_rows.sort(key=lambda r: (r["knee_score"], r["weighted_minutes"]))
-    assign_hybrid_knee(scored_pareto, knee_pool=hybrid_rows)
 
     recommendations = []
     for row in hybrid_rows:
