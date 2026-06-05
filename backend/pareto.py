@@ -1,6 +1,10 @@
 import math
 
 
+def is_hybrid_row(row: dict) -> bool:
+    return row.get("mode", "hybrid") not in ("taxi_only", "transit_only")
+
+
 def extract_pareto(rows: list[dict]) -> list[dict]:
     if not rows:
         return []
@@ -21,28 +25,28 @@ def extract_pareto(rows: list[dict]) -> list[dict]:
     return pareto
 
 
-def rank_by_knee_score(pareto_rows: list[dict]) -> list[dict]:
+def score_pareto_knee(pareto_rows: list[dict]) -> list[dict]:
     """
-    파레토 프론티어를 가중치_누적시간(weighted_minutes) 기준 정렬 후,
-    양 끝점 연결 직선 대비 signed cross product(Knee Score) 최솟값이 knee point.
-    추천순 = knee_score 오름차순 (knee가 1순위).
+    전체 파레토(baseline 포함) 기준 min-max 정규화·양 끝점 직선·knee_score 계산.
+    is_knee는 부여하지 않음 (hybrid 선정은 main에서).
     """
     if not pareto_rows:
         return []
 
-    ranked = sorted([dict(r) for r in pareto_rows], key=lambda r: r["weighted_minutes"])
+    scored = [dict(r) for r in pareto_rows]
+    for row in scored:
+        row["is_hybrid"] = is_hybrid_row(row)
+        row["is_knee"] = False
+
+    ranked = sorted(scored, key=lambda r: r["weighted_minutes"])
     n = len(ranked)
 
     if n < 3:
-        knee_idx = n // 2
-        for i, row in enumerate(ranked):
+        for row in ranked:
             row["t_norm"] = 0.0
             row["c_norm"] = 0.0
             row["knee_score"] = 0.0
-            row["is_knee"] = i == knee_idx
-        knee_row = ranked[knee_idx]
-        others = [r for i, r in enumerate(ranked) if i != knee_idx]
-        return [knee_row, *others]
+        return ranked
 
     times = [r["weighted_minutes"] for r in ranked]
     costs = [float(r["price"]) for r in ranked]
@@ -69,10 +73,22 @@ def rank_by_knee_score(pareto_rows: list[dict]) -> list[dict]:
             signed_cross = line_vec[0] * pt[1] - line_vec[1] * pt[0]
             score = signed_cross / line_len
         row["knee_score"] = round(score, 4)
+
+    return ranked
+
+
+def assign_hybrid_knee(
+    scored_pareto: list[dict],
+    knee_pool: list[dict] | None = None,
+) -> dict | None:
+    """knee_pool(hybrid 후보) 중 knee_score 최솟값에 is_knee=True. rank=1과 동일."""
+    for row in scored_pareto:
         row["is_knee"] = False
 
-    knee_idx = min(range(n), key=lambda i: ranked[i]["knee_score"])
-    ranked[knee_idx]["is_knee"] = True
+    pool = knee_pool if knee_pool is not None else [r for r in scored_pareto if r.get("is_hybrid")]
+    if not pool:
+        return None
 
-    ranked.sort(key=lambda r: (r["knee_score"], r["weighted_minutes"]))
-    return ranked
+    knee = min(pool, key=lambda r: (r["knee_score"], r["weighted_minutes"]))
+    knee["is_knee"] = True
+    return knee

@@ -14,7 +14,7 @@ load_dotenv()
 from geocode import geocode_kakao, search_keyword_kakao, reverse_geocode_kakao
 from simulate import run_simulation
 from weight import apply_weights, build_pareto_candidates
-from pareto import extract_pareto, rank_by_knee_score
+from pareto import extract_pareto, score_pareto_knee, assign_hybrid_knee, is_hybrid_row
 
 app = FastAPI(title="Opti API", version="1.0.0")
 
@@ -173,20 +173,23 @@ def analyze(req: AnalyzeRequest):
     # 3. 파레토 후보 집합 (환승 + transit_only + taxi_only) → 가중치 적용
     candidates = apply_weights(build_pareto_candidates(sim_result))
 
-    # 4. 파레토 프론티어 추출 → Knee Score로 추천순(rank)
+    # 4. 파레토 프론티어 → 전체 기준 knee_score (baseline 포함 정규화·기준선)
     pareto_rows = extract_pareto(candidates)
-    ranked_pareto = rank_by_knee_score(pareto_rows)
+    scored_pareto = score_pareto_knee(pareto_rows)
 
-    # 5. 추천 카드 (hybrid만; baseline은 별도 카드)
+    # 5. 추천 카드: hybrid만, knee_score 오름차순, ★는 hybrid 중 최솟값
     transit_baseline = sim_result["transit_only"]
     taxi_baseline    = sim_result["taxi_only"]
+
+    hybrid_rows = [
+        r for r in scored_pareto
+        if is_hybrid_row(r) and r["total_minutes"] <= transit_baseline["minutes"]
+    ]
+    hybrid_rows.sort(key=lambda r: (r["knee_score"], r["weighted_minutes"]))
+    assign_hybrid_knee(scored_pareto, knee_pool=hybrid_rows)
+
     recommendations = []
-    for row in ranked_pareto:
-        if row.get("mode") in ("taxi_only", "transit_only"):
-            continue
-        # 슬라이더·카드는 total_minutes(가중치 없음); 대중교통만보다 느린 환승은 제외
-        if row["total_minutes"] > transit_baseline["minutes"]:
-            continue
+    for row in hybrid_rows:
         over_time  = allowed_minutes is not None and row["total_minutes"] > allowed_minutes
         over_price = req.constraints.max_price is not None and row["price"] > req.constraints.max_price
         rec = _build_recommendation(row, len(recommendations) + 1)
@@ -207,7 +210,23 @@ def analyze(req: AnalyzeRequest):
             "transit_only": transit_baseline,
             "taxi_only":    taxi_baseline,
         },
+        "pareto_frontier": [_pareto_point_json(r) for r in scored_pareto],
         "recommendations": recommendations,
+    }
+
+
+def _pareto_point_json(row: dict) -> dict:
+    return {
+        "mode":             row.get("mode", "hybrid"),
+        "transfer_point":   row.get("transfer_point", ""),
+        "total_minutes":    round(row.get("total_minutes", 0), 1),
+        "weighted_minutes": round(row.get("weighted_minutes", 0), 2),
+        "price":            int(row.get("price", 0)),
+        "knee_score":       row.get("knee_score"),
+        "t_norm":           row.get("t_norm"),
+        "c_norm":           row.get("c_norm"),
+        "is_hybrid":        bool(row.get("is_hybrid")),
+        "is_knee":          bool(row.get("is_knee")),
     }
 
 
@@ -233,9 +252,9 @@ def _build_recommendation(row: dict, rank: int) -> dict:
             "minutes": round(row["taxi_minutes"], 1),
             "price":   int(row.get("taxi_price", 0)),
         },
-        "norm_distance": row.get("knee_score"),
         "knee_score":    row.get("knee_score"),
         "is_knee":       bool(row.get("is_knee")),
+        "is_hybrid":     True,
         "t_norm":          row.get("t_norm"),
         "c_norm":          row.get("c_norm"),
     }

@@ -62,7 +62,7 @@ export function ResultsPage({ from, to, data, onBack, onSelectCard }: ResultsPag
 
   const sorted = [...recommendations].sort((a, b) =>
     sortKey === "weighted"
-      ? (a.knee_score ?? a.norm_distance ?? Infinity) - (b.knee_score ?? b.norm_distance ?? Infinity)
+      ? (a.knee_score ?? Infinity) - (b.knee_score ?? Infinity)
       : sortKey === "price"
         ? a.price - b.price
         : a.total_minutes - b.total_minutes
