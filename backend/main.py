@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
@@ -142,21 +143,20 @@ def geocode(req: GeocodeRequest):
 @app.post("/analyze")
 def analyze(req: AnalyzeRequest):
     """핵심 엔드포인트: 파레토 최적 환승 지점 추천"""
-
-    # 1. 허용 소요시간 계산
-    allowed_minutes = None
-    if req.constraints.arrive_by:
-        try:
-            arrive_dt = datetime.fromisoformat(req.constraints.arrive_by.replace("+0900", "+09:00"))
-            depart_dt = datetime.fromisoformat(req.depart_time.replace("+0900", "+09:00"))
-            allowed_minutes = int((arrive_dt - depart_dt).total_seconds() / 60)
-            if allowed_minutes <= 0:
-                raise HTTPException(status_code=400, detail="도착 희망 시각이 출발 시각보다 이릅니다.")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="시각 형식이 올바르지 않습니다.")
-
-    # 2. 시뮬레이션 실행 (대중교통 + 택시 조합)
     try:
+        # 1. 허용 소요시간 계산
+        allowed_minutes = None
+        if req.constraints.arrive_by:
+            try:
+                arrive_dt = datetime.fromisoformat(req.constraints.arrive_by.replace("+0900", "+09:00"))
+                depart_dt = datetime.fromisoformat(req.depart_time.replace("+0900", "+09:00"))
+                allowed_minutes = int((arrive_dt - depart_dt).total_seconds() / 60)
+                if allowed_minutes <= 0:
+                    raise HTTPException(status_code=400, detail="도착 희망 시각이 출발 시각보다 이릅니다.")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="시각 형식이 올바르지 않습니다.")
+
+        # 2. 시뮬레이션 실행 (대중교통 + 택시 조합)
         sim_result = run_simulation(
             origin_lat=req.origin.lat,
             origin_lon=req.origin.lon,
@@ -166,53 +166,63 @@ def analyze(req: AnalyzeRequest):
             tmap_key=os.environ.get("TMAP_API_KEY", ""),
             odsay_key=os.environ.get("ODSAY_API_KEY", ""),
         )
-    except Exception as e:
-        logger.exception("run_simulation failed")
-        raise HTTPException(status_code=502, detail=f"경로 분석 실패: {str(e)}")
 
-    # 3. 파레토 후보 집합 (환승 + transit_only + taxi_only) → 가중치 적용
-    candidates = apply_weights(build_pareto_candidates(sim_result))
+        # 3. 파레토 후보 집합 (환승 + transit_only + taxi_only) → 가중치 적용
+        candidates = apply_weights(build_pareto_candidates(sim_result))
 
-    # 4. 파레토 프론티어 → 전체 기준 knee_score (baseline 포함 정규화·기준선)
-    pareto_rows = extract_pareto(candidates)
-    scored_pareto = score_pareto_knee(pareto_rows)
+        # 4. 파레토 프론티어 → 전체 기준 knee_score (baseline 포함 정규화·기준선)
+        pareto_rows = extract_pareto(candidates)
+        scored_pareto = score_pareto_knee(pareto_rows)
 
-    # 5. 추천: 파이썬 find_knee_point과 동일 — 파레토 전체(baseline 포함)에서 무릎점 선택
-    transit_baseline = sim_result["transit_only"]
-    taxi_baseline    = sim_result["taxi_only"]
+        # 5. 추천: 파이썬 find_knee_point과 동일 — 파레토 전체(baseline 포함)에서 무릎점 선택
+        transit_baseline = sim_result["transit_only"]
+        taxi_baseline    = sim_result["taxi_only"]
 
-    assign_full_knee(scored_pareto)
+        assign_full_knee(scored_pareto)
 
-    # 카드 목록: hybrid 파레토 점 전체, knee_score 오름차순
-    # (사전 total_minutes 필터 없음 → 파이썬 프론티어/무릎점과 동일 결과)
-    hybrid_rows = [r for r in scored_pareto if is_hybrid_row(r)]
-    hybrid_rows.sort(key=lambda r: (r["knee_score"], r["weighted_minutes"]))
+        # 카드 목록: hybrid 파레토 점 전체, knee_score 오름차순
+        # (사전 total_minutes 필터 없음 → 파이썬 프론티어/무릎점과 동일 결과)
+        hybrid_rows = [r for r in scored_pareto if is_hybrid_row(r)]
+        hybrid_rows.sort(key=lambda r: (r["knee_score"], r["weighted_minutes"]))
 
-    recommendations = []
-    for row in hybrid_rows:
-        over_time  = allowed_minutes is not None and row["total_minutes"] > allowed_minutes
-        over_price = req.constraints.max_price is not None and row["price"] > req.constraints.max_price
-        rec = _build_recommendation(row, len(recommendations) + 1)
-        rec["over_constraint"] = over_time or over_price
-        rec["over_label"] = ("시간 초과" if over_time else "비용 초과" if over_price else None)
-        recommendations.append(rec)
+        recommendations = []
+        for row in hybrid_rows:
+            over_time  = allowed_minutes is not None and row["total_minutes"] > allowed_minutes
+            over_price = req.constraints.max_price is not None and row["price"] > req.constraints.max_price
+            rec = _build_recommendation(row, len(recommendations) + 1)
+            rec["over_constraint"] = over_time or over_price
+            rec["over_label"] = ("시간 초과" if over_time else "비용 초과" if over_price else None)
+            recommendations.append(rec)
 
-    # 6. 기준선 비교값 채우기
-    for rec in recommendations:
-        rec["savings"] = {
-            "vs_transit_minutes": transit_baseline["minutes"] - rec["total_minutes"],
-            "vs_taxi_price":      taxi_baseline["price"] - rec["price"],
+        # 6. 기준선 비교값 채우기
+        for rec in recommendations:
+            rec["savings"] = {
+                "vs_transit_minutes": transit_baseline["minutes"] - rec["total_minutes"],
+                "vs_taxi_price":      taxi_baseline["price"] - rec["price"],
+            }
+
+        return {
+            "allowed_minutes": allowed_minutes,
+            "baselines": {
+                "transit_only": transit_baseline,
+                "taxi_only":    taxi_baseline,
+            },
+            "pareto_frontier": [_pareto_point_json(r) for r in scored_pareto],
+            "recommendations": recommendations,
         }
-
-    return {
-        "allowed_minutes": allowed_minutes,
-        "baselines": {
-            "transit_only": transit_baseline,
-            "taxi_only":    taxi_baseline,
-        },
-        "pareto_frontier": [_pareto_point_json(r) for r in scored_pareto],
-        "recommendations": recommendations,
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(
+            f"/analyze coords origin=({req.origin.lat}, {req.origin.lon}) "
+            f"destination=({req.destination.lat}, {req.destination.lon})"
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e), "trace": traceback.format_exc()},
+        )
 
 
 def _pareto_point_json(row: dict) -> dict:
