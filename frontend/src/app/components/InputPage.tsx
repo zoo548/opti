@@ -1,8 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, Loader2 } from "lucide-react";
 import { SearchParams } from "../App";
 import { BACKEND } from "../../config";
 import { OPTI } from "../optiTheme";
+import {
+  ensureKakaoMapsReady,
+  createPlacesService,
+  createGeocoderService,
+} from "../../kakaoMaps";
 
 interface InputPageProps {
   onSearch: (params: SearchParams) => void;
@@ -15,43 +20,90 @@ interface KakaoPlace {
   road_address_name?: string;
 }
 
-function useKakaoSearch(query: string, onError: (msg: string | null) => void) {
+interface ResolvedPlace {
+  label: string;
+  address: string;
+  lat: number;
+  lon: number;
+}
+
+const SEARCH_SIZE = 5;
+const DEBOUNCE_MS = 300;
+
+function toKakaoPlace(doc: KakaoPlaceDocument): KakaoPlace {
+  return {
+    id: doc.id,
+    place_name: doc.place_name,
+    address_name: doc.address_name,
+    road_address_name: doc.road_address_name,
+  };
+}
+
+function useKakaoSearch(
+  query: string,
+  places: kakao.maps.services.Places | null,
+  onError: (msg: string | null) => void,
+  queryCache: Map<string, KakaoPlace[]>
+) {
   const [results, setResults] = useState<KakaoPlace[]>([]);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   useEffect(() => {
-    if (query.trim().length < 2) {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
       setResults([]);
-      onError(null);
+      onErrorRef.current(null);
       return;
     }
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `${BACKEND}/search?q=${encodeURIComponent(query)}`
-        );
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          const detail = typeof data.detail === "string" ? data.detail : `검색 실패 (${res.status})`;
-          throw new Error(detail);
-        }
-        if (!cancelled) {
-          setResults(data.documents ?? []);
-          onError(null);
-        }
-      } catch (e: unknown) {
-        if (!cancelled) {
+
+    const cached = queryCache.get(trimmed);
+    if (cached) {
+      setResults(cached);
+      onErrorRef.current(null);
+      return;
+    }
+
+    if (!places) {
+      return;
+    }
+
+    const abort = new AbortController();
+    const timer = setTimeout(() => {
+      if (abort.signal.aborted) return;
+
+      places.keywordSearch(
+        trimmed,
+        (data, status) => {
+          if (abort.signal.aborted) return;
+
+          if (status === kakao.maps.services.Status.OK) {
+            const items = data.slice(0, SEARCH_SIZE).map(toKakaoPlace);
+            queryCache.set(trimmed, items);
+            setResults(items);
+            onErrorRef.current(null);
+            return;
+          }
+
+          if (status === kakao.maps.services.Status.ZERO_RESULT) {
+            queryCache.set(trimmed, []);
+            setResults([]);
+            onErrorRef.current(null);
+            return;
+          }
+
           setResults([]);
-          onError(e instanceof Error ? e.message : "자동완성 요청 실패");
-        }
-      }
-    }, 300);
+          onErrorRef.current("자동완성 검색 실패");
+        },
+        { size: SEARCH_SIZE }
+      );
+    }, DEBOUNCE_MS);
 
     return () => {
-      cancelled = true;
+      abort.abort();
       clearTimeout(timer);
     };
-  }, [query, onError]);
+  }, [query, places, queryCache]);
 
   return results;
 }
@@ -100,9 +152,29 @@ function SuggestionList({
   );
 }
 
+async function geocodeViaBackend(address: string): Promise<ResolvedPlace> {
+  const res = await fetch(`${BACKEND}/geocode`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address }),
+  });
+  if (!res.ok) {
+    throw new Error("주소를 찾을 수 없습니다.");
+  }
+  const data = await res.json();
+  return {
+    label: address,
+    address: data.address,
+    lat: data.lat,
+    lon: data.lon,
+  };
+}
+
 export function InputPage({ onSearch }: InputPageProps) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
+  const [originResolved, setOriginResolved] = useState<ResolvedPlace | null>(null);
+  const [destResolved, setDestResolved] = useState<ResolvedPlace | null>(null);
   const [showOriginSug, setShowOriginSug] = useState(false);
   const [showDestSug, setShowDestSug] = useState(false);
   const [focusField, setFocusField] = useState<"from" | "to" | null>(null);
@@ -110,15 +182,77 @@ export function InputPage({ onSearch }: InputPageProps) {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [sdkReady, setSdkReady] = useState(false);
 
-  const originResults = useKakaoSearch(origin, setSearchError);
-  const destResults = useKakaoSearch(destination, setSearchError);
+  const placesRef = useRef<kakao.maps.services.Places | null>(null);
+  const geocoderRef = useRef<kakao.maps.services.Geocoder | null>(null);
+  const queryCacheRef = useRef(new Map<string, KakaoPlace[]>());
+
+  useEffect(() => {
+    let cancelled = false;
+    ensureKakaoMapsReady()
+      .then(() => {
+        if (cancelled) return;
+        placesRef.current = createPlacesService();
+        geocoderRef.current = createGeocoderService();
+        setSdkReady(true);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setSearchError(e instanceof Error ? e.message : "Kakao Maps SDK 로드 실패");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const originResults = useKakaoSearch(
+    origin,
+    sdkReady ? placesRef.current : null,
+    setSearchError,
+    queryCacheRef.current
+  );
+  const destResults = useKakaoSearch(
+    destination,
+    sdkReady ? placesRef.current : null,
+    setSearchError,
+    queryCacheRef.current
+  );
+
+  const geocodeOnSelect = useCallback(
+    (place: KakaoPlace, setResolved: (value: ResolvedPlace | null) => void) => {
+      const label = place.place_name || place.address_name;
+      const queryAddress = place.road_address_name || place.address_name || place.place_name;
+      const geocoder = geocoderRef.current;
+      if (!geocoder) {
+        setResolved(null);
+        return;
+      }
+
+      geocoder.addressSearch(queryAddress, (result, status) => {
+        if (status !== kakao.maps.services.Status.OK || !result[0]) {
+          setResolved(null);
+          return;
+        }
+        setResolved({
+          label,
+          address: result[0].address_name || label,
+          lat: parseFloat(result[0].y),
+          lon: parseFloat(result[0].x),
+        });
+      });
+    },
+    []
+  );
 
   const canSearch = origin.length > 0 && destination.length > 0;
 
   const handleSwap = () => {
     setOrigin(destination);
     setDestination(origin);
+    setOriginResolved(destResolved);
+    setDestResolved(originResolved);
   };
 
   const handleCurrentLocation = () => {
@@ -139,6 +273,12 @@ export function InputPage({ onSearch }: InputPageProps) {
           const data = await res.json();
           if (data.address && data.address !== "현재 위치") {
             setOrigin(data.address);
+            setOriginResolved({
+              label: data.address,
+              address: data.address,
+              lat: latitude,
+              lon: longitude,
+            });
           } else {
             setGeoError("현재 위치의 주소를 찾을 수 없습니다.");
           }
@@ -155,29 +295,33 @@ export function InputPage({ onSearch }: InputPageProps) {
     );
   };
 
+  const resolveField = async (
+    text: string,
+    resolved: ResolvedPlace | null
+  ): Promise<ResolvedPlace> => {
+    if (resolved && resolved.label === text) {
+      return resolved;
+    }
+    return geocodeViaBackend(text);
+  };
+
   const handleSearch = async () => {
     if (!canSearch) return;
     setLoading(true);
     setGeoError(null);
     try {
-      const [originRes, destRes] = await Promise.all([
-        fetch(`${BACKEND}/geocode`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: origin }),
-        }),
-        fetch(`${BACKEND}/geocode`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: destination }),
-        }),
-      ]);
-
-      if (!originRes.ok) throw new Error("출발지 주소를 찾을 수 없습니다.");
-      if (!destRes.ok) throw new Error("도착지 주소를 찾을 수 없습니다.");
-
-      const originData = await originRes.json();
-      const destData = await destRes.json();
+      let originData: ResolvedPlace;
+      let destData: ResolvedPlace;
+      try {
+        originData = await resolveField(origin, originResolved);
+      } catch {
+        throw new Error("출발지 주소를 찾을 수 없습니다.");
+      }
+      try {
+        destData = await resolveField(destination, destResolved);
+      } catch {
+        throw new Error("도착지 주소를 찾을 수 없습니다.");
+      }
 
       const now = new Date();
       const fmt = (d: Date) =>
@@ -203,6 +347,8 @@ export function InputPage({ onSearch }: InputPageProps) {
     border: focusField === field ? `1.5px solid ${OPTI.primary}` : "1.5px solid transparent",
   });
 
+  const shouldShowSuggestions = (text: string) => text.trim().length >= 2;
+
   return (
     <div className="min-h-screen flex flex-col justify-center" style={{ background: OPTI.surface }}>
       <div className="px-4 mb-8 text-center">
@@ -223,11 +369,12 @@ export function InputPage({ onSearch }: InputPageProps) {
                 value={origin}
                 onChange={(e) => {
                   setOrigin(e.target.value);
-                  setShowOriginSug(e.target.value.length > 0);
+                  setOriginResolved(null);
+                  setShowOriginSug(shouldShowSuggestions(e.target.value));
                 }}
                 onFocus={() => {
                   setFocusField("from");
-                  setShowOriginSug(origin.length > 0);
+                  setShowOriginSug(shouldShowSuggestions(origin));
                 }}
                 onBlur={() => {
                   setFocusField(null);
@@ -238,7 +385,12 @@ export function InputPage({ onSearch }: InputPageProps) {
                 style={{ color: OPTI.text }}
               />
               {origin ? (
-                <ClearButton onClick={() => setOrigin("")} />
+                <ClearButton
+                  onClick={() => {
+                    setOrigin("");
+                    setOriginResolved(null);
+                  }}
+                />
               ) : (
                 <button
                   type="button"
@@ -264,8 +416,11 @@ export function InputPage({ onSearch }: InputPageProps) {
               <SuggestionList
                 items={originResults}
                 onSelect={(p) => {
-                  setOrigin(p.place_name || p.address_name);
+                  const label = p.place_name || p.address_name;
+                  setOrigin(label);
+                  setOriginResolved(null);
                   setShowOriginSug(false);
+                  geocodeOnSelect(p, setOriginResolved);
                 }}
               />
             )}
@@ -301,11 +456,12 @@ export function InputPage({ onSearch }: InputPageProps) {
                   value={destination}
                   onChange={(e) => {
                     setDestination(e.target.value);
-                    setShowDestSug(e.target.value.length > 0);
+                    setDestResolved(null);
+                    setShowDestSug(shouldShowSuggestions(e.target.value));
                   }}
                   onFocus={() => {
                     setFocusField("to");
-                    setShowDestSug(destination.length > 0);
+                    setShowDestSug(shouldShowSuggestions(destination));
                   }}
                   onBlur={() => {
                     setFocusField(null);
@@ -315,14 +471,24 @@ export function InputPage({ onSearch }: InputPageProps) {
                   className="flex-1 bg-transparent outline-none text-[14px] placeholder-[#aaa] min-w-0"
                   style={{ color: OPTI.text }}
                 />
-                {destination && <ClearButton onClick={() => setDestination("")} />}
+                {destination && (
+                  <ClearButton
+                    onClick={() => {
+                      setDestination("");
+                      setDestResolved(null);
+                    }}
+                  />
+                )}
               </div>
               {showDestSug && destResults.length > 0 && (
                 <SuggestionList
                   items={destResults}
                   onSelect={(p) => {
-                    setDestination(p.place_name || p.address_name);
+                    const label = p.place_name || p.address_name;
+                    setDestination(label);
+                    setDestResolved(null);
                     setShowDestSug(false);
+                    geocodeOnSelect(p, setDestResolved);
                   }}
                 />
               )}

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { InputPage } from "./components/InputPage";
 import { LoadingPage } from "./components/LoadingPage";
 import { ResultsPage } from "./components/ResultsPage";
@@ -7,7 +7,8 @@ import { Recommendation } from "./components/mockData";
 
 type Page = "input" | "loading" | "results" | "detail";
 
-import { BACKEND } from "../config";
+import { BACKEND, KAKAO_JS_KEY } from "../config";
+import { preloadKakaoMaps } from "../kakaoMaps";
 
 export interface SearchParams {
   origin: { address: string; lat: number; lon: number };
@@ -18,6 +19,10 @@ export interface SearchParams {
 }
 
 export default function App() {
+  useEffect(() => {
+    preloadKakaoMaps(KAKAO_JS_KEY);
+  }, []);
+
   const [page, setPage] = useState<Page>("input");
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
